@@ -20,7 +20,7 @@ services:
       - no-new-privileges:true
 
   backend:
-    image: motihc/vuln-backend:latest
+    image: motihc/vuln-backend:1.0.0
     container_name: vuln-backend-prod
     restart: always
     networks:
@@ -44,7 +44,7 @@ services:
       - no-new-privileges:true
 
   frontend:
-    image: motihc/vuln-frontend:latest
+    image: motihc/vuln-frontend:1.0.0
     container_name: vuln-frontend-prod
     restart: always
     networks:
