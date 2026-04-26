@@ -83,15 +83,22 @@ public class WazuhService {
     }
 
     public Map<String, Object> getVulnerabilitiesByAgent(WazuhCredentials creds, String agentId, int limit) throws Exception {
-        // Wazuh 5.0: agent ID is encoded in _id as "<agentId>_<hash>_<CVE>", use prefix filter
+        // Wazuh 4.x: agent.id field exists in _source
+        // Wazuh 5.0: agent.id removed, ID encoded as "<agentId>_<hash>_<CVE>" in _id
         String body = """
                 {
                   "size": %d,
                   "query": {
-                    "prefix": { "_id": "%s_" }
+                    "bool": {
+                      "should": [
+                        { "match": { "agent.id": "%s" } },
+                        { "prefix": { "_id": "%s_" } }
+                      ],
+                      "minimum_should_match": 1
+                    }
                   }
                 }
-                """.formatted(limit, agentId);
+                """.formatted(limit, agentId, agentId);
         return executeWithTunnel(creds, body);
     }
 
