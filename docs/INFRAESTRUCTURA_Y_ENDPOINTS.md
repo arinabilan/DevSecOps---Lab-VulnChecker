@@ -47,9 +47,74 @@ cd wazuh-docker/single-node
 
 ### 3. Generar certificados SSL
 
+Wazuh requiere certificados TLS para la comunicación interna entre Manager, Indexer y Dashboard. El proceso usa el script oficial `wazuh-certs-tool.sh`.
+
+**3.1 — Descargar el script y el archivo de configuración**
+
 ```bash
-docker compose -f generate-indexer-certs.yml run --rm generator
+cd ~/wazuh-docker/single-node
+
+# Descargar la herramienta de generación de certificados
+curl -sO https://packages.wazuh.com/5.0/wazuh-certs-tool.sh
+chmod +x wazuh-certs-tool.sh
 ```
+
+El archivo `config.yml` ya viene en el repositorio y define los nodos para los que se generarán los certificados (indexer, manager, dashboard).
+
+**3.2 — Generar todos los certificados**
+
+```bash
+bash wazuh-certs-tool.sh -A
+```
+
+Esto crea el directorio `wazuh-certificates/` con:
+
+```
+wazuh-certificates/
+├── root-ca.pem              # CA raíz
+├── root-ca-key.pem
+├── admin.pem                # Cert de administración (OpenSearch)
+├── admin-key.pem
+├── wazuh.indexer.pem        # Cert del Indexer
+├── wazuh.indexer-key.pem
+├── wazuh.manager.pem        # Cert del Manager
+├── wazuh.manager-key.pem
+├── wazuh.dashboard.pem      # Cert del Dashboard
+└── wazuh.dashboard-key.pem
+```
+
+**3.3 — Copiar certificados a cada componente**
+
+```bash
+mkdir -p config/wazuh_indexer/certs config/wazuh_manager/certs config/wazuh_dashboard/certs
+
+# Indexer
+cp wazuh-certificates/root-ca.pem config/wazuh_indexer/certs/
+cp wazuh-certificates/wazuh.indexer.pem config/wazuh_indexer/certs/
+cp wazuh-certificates/wazuh.indexer-key.pem config/wazuh_indexer/certs/
+cp wazuh-certificates/admin.pem config/wazuh_indexer/certs/
+cp wazuh-certificates/admin-key.pem config/wazuh_indexer/certs/
+
+# Manager
+cp wazuh-certificates/root-ca.pem config/wazuh_manager/certs/
+cp wazuh-certificates/wazuh.manager.pem config/wazuh_manager/certs/
+cp wazuh-certificates/wazuh.manager-key.pem config/wazuh_manager/certs/
+
+# Dashboard
+cp wazuh-certificates/root-ca.pem config/wazuh_dashboard/certs/
+cp wazuh-certificates/wazuh.dashboard.pem config/wazuh_dashboard/certs/
+cp wazuh-certificates/wazuh.dashboard-key.pem config/wazuh_dashboard/certs/
+```
+
+**3.4 — Asegurar permisos**
+
+```bash
+chmod 400 config/wazuh_indexer/certs/* \
+           config/wazuh_manager/certs/* \
+           config/wazuh_dashboard/certs/*
+```
+
+> Sin completar estos pasos el stack no arranca — los servicios rechazan conexiones sin certificados válidos.
 
 ### 4. Levantar el stack de Wazuh
 
