@@ -215,6 +215,16 @@ public class WazuhService {
     }
 
     // Clase interna para manejar el conteo sin ensuciar el método principal
+    // Wazuh 4.x: source["agent"] | Wazuh 5.0: source["wazuh"]["agent"]
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractAgent(Map<String, Object> source) {
+        Map<String, Object> agent = (Map<String, Object>) source.get("agent");
+        if (agent != null) return agent;
+        Map<String, Object> wazuh = (Map<String, Object>) source.get("wazuh");
+        if (wazuh != null) return (Map<String, Object>) wazuh.get("agent");
+        return null;
+    }
+
     private static class SnapshotCounter {
         String agentId = "";
         String agentName = "";
@@ -223,11 +233,10 @@ public class WazuhService {
         int med = 0;
         int low = 0;
 
-        void count(Map<String, Object> source) {
+        void count(Map<String, Object> source, Map<String, Object> agent) {
             Map<String, Object> v = (Map<String, Object>) source.get("vulnerability");
-            Map<String, Object> a = (Map<String, Object>) source.get("agent");
-            this.agentId = (String) a.get("id");
-            Object name = a.get("name");
+            this.agentId = (String) agent.get("id");
+            Object name = agent.get("name");
             if (name != null && !name.toString().isBlank()) {
                 this.agentName = name.toString();
             }
@@ -301,6 +310,7 @@ public class WazuhService {
         });
     }
 
+    @SuppressWarnings("unchecked")
     private void processAndSaveBatch(List<Map<String, Object>> hits, Map<String, SnapshotCounter> countersByAgent) {
         List<VulnerabilityEntity> entitiesToSave = new java.util.ArrayList<>();
 
@@ -308,14 +318,19 @@ public class WazuhService {
             try {
                 Map<String, Object> source = (Map<String, Object>) hit.get("_source");
                 Map<String, Object> v = (Map<String, Object>) source.get("vulnerability");
-                Map<String, Object> a = (Map<String, Object>) source.get("agent");
+                Map<String, Object> a = extractAgent(source);
                 Map<String, Object> p = (Map<String, Object>) source.get("package");
+
+                if (v == null || a == null) {
+                    log.warn("Hit sin vulnerability o agent, omitido");
+                    continue;
+                }
 
                 String cve = (String) v.get("id");
                 String agentId = (String) a.get("id");
-                String pkgName = (String) p.get("name");
+                String pkgName = (p != null) ? (String) p.get("name") : null;
 
-                countersByAgent.computeIfAbsent(agentId, ignored -> new SnapshotCounter()).count(source);
+                countersByAgent.computeIfAbsent(agentId, ignored -> new SnapshotCounter()).count(source, a);
 
                 if (vulnerabilityRepository.existsByCveAndAgentIdAndPackageName(cve, agentId, pkgName)) {
                     continue;
@@ -326,7 +341,7 @@ public class WazuhService {
                 entity.setAgentId(agentId);
                 entity.setAgentName((String) a.get("name"));
                 entity.setPackageName(pkgName);
-                entity.setPackageVersion((String) p.get("version"));
+                entity.setPackageVersion((p != null) ? (String) p.get("version") : null);
                 entity.setSeverity((String) v.get("severity"));
                 entity.setStatus("Active");
 
