@@ -8,9 +8,7 @@ RUN npm run build
 
 # Etapa 2: Servidor de producción
 FROM nginx:stable-alpine
-# COPIAR LA CONFIGURACIÓN PERSONALIZADA
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-# Copiar los archivos construidos de React
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh", "-c", "envsubst '${BACKEND_URL}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
