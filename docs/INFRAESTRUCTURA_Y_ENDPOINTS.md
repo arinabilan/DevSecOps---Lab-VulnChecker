@@ -53,10 +53,16 @@
 postgresql://admin:admin123@bilan-vulncheck-qg6jib:5432/vulncheck
 ```
 
-**PostgreSQL — Conexión externa (desde internet / cliente SQL):**
+**PostgreSQL — Conexión externa (cliente SQL: DBeaver, psql, TablePlus):**
 ```
 postgresql://admin:admin123@68.183.110.20:5432/vulncheck
 ```
+
+**PostgreSQL — Conexión externa JDBC (Java / Spring Boot):**
+```
+jdbc:postgresql://68.183.110.20:5432/vulncheck
+```
+Usuario: `admin` | Contraseña: `admin123`
 
 ### Vercel (Frontend)
 
