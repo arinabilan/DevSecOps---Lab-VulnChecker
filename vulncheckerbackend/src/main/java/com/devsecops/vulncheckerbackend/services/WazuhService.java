@@ -78,16 +78,17 @@ public class WazuhService {
                     "match": { "vulnerability.severity": "%s" }
                   }
                 }
-                """.formatted(limit, severity.toLowerCase());
+                """.formatted(limit, capitalize(severity));
         return executeWithTunnel(creds, body);
     }
 
     public Map<String, Object> getVulnerabilitiesByAgent(WazuhCredentials creds, String agentId, int limit) throws Exception {
+        // Wazuh 5.0: agent ID is encoded in _id as "<agentId>_<hash>_<CVE>", use prefix filter
         String body = """
                 {
                   "size": %d,
                   "query": {
-                    "match": { "agent.id": "%s" }
+                    "prefix": { "_id": "%s_" }
                   }
                 }
                 """.formatted(limit, agentId);
@@ -107,7 +108,12 @@ public class WazuhService {
     }
 
     public Map<String, Object> getCriticalVulnerabilities(WazuhCredentials creds) throws Exception {
-        return getVulnerabilitiesBySeverity(creds, "critical", 500);
+        return getVulnerabilitiesBySeverity(creds, "Critical", 500);
+    }
+
+    private String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
     }
 
     public Map<String, Object> getVulnerabilitiesSummary(WazuhCredentials creds) throws Exception {
