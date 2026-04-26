@@ -33,7 +33,7 @@ public class WazuhService {
     private final VulnerabilitySnapshotRepository snapshotRepository;
     private final Executor taskExecutor;
 
-    private static final String VULN_INDEX = "wazuh-states-vulnerabilities-*";
+    private static final String VULN_INDEX = "wazuh-states-vulnerabilities";
 
     public WazuhService(SshTunnelManager tunnelManager,
                         @Qualifier("wazuhRestTemplate") RestTemplate restTemplate,
