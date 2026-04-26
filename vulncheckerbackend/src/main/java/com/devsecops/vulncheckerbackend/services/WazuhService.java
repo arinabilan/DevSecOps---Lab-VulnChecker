@@ -83,16 +83,15 @@ public class WazuhService {
     }
 
     public Map<String, Object> getVulnerabilitiesByAgent(WazuhCredentials creds, String agentId, int limit) throws Exception {
-        // Wazuh 4.x: agent.id field exists in _source
-        // Wazuh 5.0: agent.id removed, ID encoded as "<agentId>_<hash>_<CVE>" in _id
+        // Wazuh 4.x: agent.id  |  Wazuh 5.0: wazuh.agent.id
         String body = """
                 {
                   "size": %d,
                   "query": {
                     "bool": {
                       "should": [
-                        { "match": { "agent.id": "%s" } },
-                        { "prefix": { "_id": "%s_" } }
+                        { "term": { "agent.id": "%s" } },
+                        { "term": { "wazuh.agent.id": "%s" } }
                       ],
                       "minimum_should_match": 1
                     }
