@@ -69,7 +69,7 @@ Usuario: `admin` | Contraseña: `admin123`
 | Acceso | Valor |
 |---|---|
 | URL producción | `https://vulnchecker-frontend.vercel.app` |
-| Repositorio | `andressep95/DevSecOps---Lab-VulnChecker` |
+| Repositorio | `arinabilan/DevSecOps---Lab-VulnChecker` |
 | Root Directory | `frontend` |
 | Variable de entorno | `VITE_API_URL=https://68.183.110.20.nip.io` |
 
@@ -290,7 +290,7 @@ En Dokploy → **New Service → Application**:
 | Campo | Valor |
 |---|---|
 | Provider | GitHub |
-| Repository | `andressep95/DevSecOps---Lab-VulnChecker` |
+| Repository | `arinabilan/DevSecOps---Lab-VulnChecker` |
 | Branch | `main` |
 | Build Path | `/vulncheckerbackend` |
 | Docker File | `./Dockerfile` |
@@ -412,7 +412,7 @@ El frontend es una SPA React desplegada en Vercel directamente desde el reposito
 ### 1. Crear proyecto en Vercel
 
 1. Ir a [vercel.com](https://vercel.com) → **New Project**
-2. Importar repositorio: `andressep95/DevSecOps---Lab-VulnChecker`
+2. Importar repositorio: `arinabilan/DevSecOps---Lab-VulnChecker`
 3. Configurar build:
 
 | Campo | Valor |
