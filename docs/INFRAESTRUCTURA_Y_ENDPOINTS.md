@@ -7,7 +7,7 @@
 | Wazuh Manager | ✅ Running | Contabo 217.216.48.103 |
 | Wazuh Indexer | ✅ Running | 2.763 vulnerabilidades indexadas |
 | Wazuh Agent | ✅ Active | digitalocean-vulnchecker (ID: 001) |
-| Backend API | ✅ UP | DigitalOcean 68.183.110.20 (HTTPS) |
+| Backend API | ✅ UP | DigitalOcean 157.230.177.115 (HTTPS) |
 | PostgreSQL | ✅ Running | DigitalOcean (interno, Dokploy) |
 | SSH Tunnel | ✅ Funcional | DigitalOcean → Contabo :9200 |
 | Frontend | ✅ Running | Vercel (vulnchecker-frontend.vercel.app) |
@@ -19,12 +19,12 @@
 | Servicio | URL | Notas |
 |---|---|---|
 | Frontend (Vercel) | `https://vulnchecker-frontend.vercel.app` | SPA React |
-| Backend API | `https://68.183.110.20.nip.io/api` | Spring Boot |
-| Backend Health | `https://68.183.110.20.nip.io/actuator/health` | `{"status":"UP"}` |
-| Dokploy UI | `http://68.183.110.20:3000` | Panel de despliegue |
+| Backend API | `https://157.230.177.115.nip.io/api` | Spring Boot |
+| Backend Health | `https://157.230.177.115.nip.io/actuator/health` | `{"status":"UP"}` |
+| Dokploy UI | `http://157.230.177.115:3000` | Panel de despliegue |
 | Wazuh Dashboard | `https://217.216.48.103:4430` | admin / admin |
 | Wazuh Indexer API | `https://217.216.48.103:9200` | admin / admin |
-| PostgreSQL (externo) | `postgresql://admin:admin123@68.183.110.20:5432/vulncheck` | Cliente SQL externo |
+| PostgreSQL (externo) | `postgresql://admin:admin123@157.230.177.115:5432/vulncheck` | Cliente SQL externo |
 | PostgreSQL (interno) | `postgresql://admin:admin123@bilan-vulncheck-qg6jib:5432/vulncheck` | Entre contenedores Dokploy |
 
 ---
@@ -44,7 +44,7 @@
 | Acceso | Usuario | Contraseña / Valor |
 |---|---|---|
 | SSH / root | `root` | (password del droplet) |
-| Dokploy UI | — | `http://68.183.110.20:3000` (primer acceso crea cuenta) |
+| Dokploy UI | — | `http://157.230.177.115:3000` (primer acceso crea cuenta) |
 | PostgreSQL | `admin` | `admin123` |
 | Base de datos | `vulncheck` | — |
 
@@ -55,12 +55,12 @@ postgresql://admin:admin123@bilan-vulncheck-qg6jib:5432/vulncheck
 
 **PostgreSQL — Conexión externa (cliente SQL: DBeaver, psql, TablePlus):**
 ```
-postgresql://admin:admin123@68.183.110.20:5432/vulncheck
+postgresql://admin:admin123@157.230.177.115:5432/vulncheck
 ```
 
 **PostgreSQL — Conexión externa JDBC (Java / Spring Boot):**
 ```
-jdbc:postgresql://68.183.110.20:5432/vulncheck
+jdbc:postgresql://157.230.177.115:5432/vulncheck
 ```
 Usuario: `admin` | Contraseña: `admin123`
 
@@ -71,7 +71,7 @@ Usuario: `admin` | Contraseña: `admin123`
 | URL producción | `https://vulnchecker-frontend.vercel.app` |
 | Repositorio | `arinabilan/DevSecOps---Lab-VulnChecker` |
 | Root Directory | `frontend` |
-| Variable de entorno | `VITE_API_URL=https://68.183.110.20.nip.io` |
+| Variable de entorno | `VITE_API_URL=https://157.230.177.115.nip.io` |
 
 ### Aplicación VulnChecker (credenciales de prueba)
 
@@ -100,13 +100,13 @@ Crear en **Settings → Credenciales** dentro de la app:
 
 ```
 [Vercel] vulnchecker-frontend.vercel.app
-  └── HTTPS → [DigitalOcean] https://68.183.110.20.nip.io/api
+  └── HTTPS → [DigitalOcean] https://157.230.177.115.nip.io/api
                   └── Spring Boot :8080
                         └── SSH tunnel (JSch) → sepul@217.216.48.103:22
                                                    └── OpenSearch :9200
                                                          └── 2.763 vulnerabilidades
 
-[Wazuh Agent] (68.183.110.20)
+[Wazuh Agent] (157.230.177.115)
   └── reporta eventos → [Wazuh Manager] 217.216.48.103:1514
                              └── indexa → OpenSearch :9200
 ```
@@ -252,7 +252,7 @@ curl -sk -u admin:admin https://localhost:9200
 
 ## Guía de configuración — Máquina 2 (DigitalOcean / Backend)
 
-**IP:** `68.183.110.20` | **Usuario:** `root`
+**IP:** `157.230.177.115` | **Usuario:** `root`
 
 ### 1. Crear el Droplet en DigitalOcean
 
@@ -269,7 +269,7 @@ curl -sSL https://dokploy.com/install.sh | bash
 
 > Usar `bash`, no `sh` — el script usa sintaxis bash que `sh` no entiende.
 
-Dokploy queda accesible en `http://68.183.110.20:3000`. Registrarse en el primer acceso.
+Dokploy queda accesible en `http://157.230.177.115:3000`. Registrarse en el primer acceso.
 
 ### 3. Crear la base de datos en Dokploy
 
@@ -322,7 +322,7 @@ En la pestaña **Domains** del Application:
 
 | Campo | Valor |
 |---|---|
-| Host | `68.183.110.20.nip.io` |
+| Host | `157.230.177.115.nip.io` |
 | Path | `/` |
 | Port | `8080` |
 | HTTPS | **Yes** (Let's Encrypt) |
@@ -336,7 +336,7 @@ Click en **Deploy**. El build tarda ~3-5 minutos (Maven descarga dependencias).
 ### 8. Verificar que el backend está activo
 
 ```bash
-curl https://68.183.110.20.nip.io/actuator/health
+curl https://157.230.177.115.nip.io/actuator/health
 # {"status":"UP"}
 ```
 
@@ -428,7 +428,7 @@ En **Settings → Environment Variables**:
 
 | Variable | Valor |
 |---|---|
-| `VITE_API_URL` | `https://68.183.110.20.nip.io` |
+| `VITE_API_URL` | `https://157.230.177.115.nip.io` |
 
 > Esta variable se inyecta en el bundle en tiempo de build. Apunta al backend con HTTPS para evitar Mixed Content.
 
@@ -488,7 +488,7 @@ El proceso corre en background (~5-10 minutos para 2.763 registros). La pantalla
 ## Variables y endpoints para pruebas con curl
 
 ```bash
-BASE="https://68.183.110.20.nip.io/api/vulns"
+BASE="https://157.230.177.115.nip.io/api/vulns"
 SSH_HOST="217.216.48.103"
 SSH_USER="sepul"
 SSH_PASS="Sepul1995"
@@ -499,7 +499,7 @@ WAZUH_AUTH="Authorization: Basic $(echo -n 'admin:admin' | base64)"
 
 ```bash
 # Health check
-curl https://68.183.110.20.nip.io/actuator/health
+curl https://157.230.177.115.nip.io/actuator/health
 # {"status":"UP"}
 
 # Vulnerabilidades sincronizadas en BD local
