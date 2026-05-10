@@ -1,0 +1,37 @@
+name: CI/CD Pipeline (SonarQube + Dokploy)
+
+on:
+  push:
+    branches:
+      - main  # Si tu rama principal se llama 'master', cámbialo aquí
+
+jobs:
+  sonarqube:
+    name: Análisis de Código
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Escaneo de SonarQube
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Verificar Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  deploy:
+    name: Despliegue en Dokploy
+    needs: sonarqube  # Esto bloquea el despliegue si SonarQube falla
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a Webhook de Dokploy
+        run: |
+          curl -X GET "${{ secrets.DOKPLOY_WEBHOOK_URL }}"
