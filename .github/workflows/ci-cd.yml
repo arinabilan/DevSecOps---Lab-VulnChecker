@@ -35,4 +35,4 @@ jobs:
     steps:
       - name: Llamar a Webhook de Dokploy
         run: |
-          curl -is -X POST "${{ secrets.DOKPLOY_WEBHOOK_URL }}&branch=main"
+          curl -is -X POST "${{ secrets.DOKPLOY_WEBHOOK_URL }}?branch=main"
