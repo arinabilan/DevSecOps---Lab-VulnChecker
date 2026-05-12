@@ -47,7 +47,8 @@ jobs:
 
       - name: Compilar con Maven
         # Ejecutamos el empaquetado saltando tests para verificar que el código es válido
-        run: mvn clean package -DskipTests -B
+        # Añadimos -f para indicarle el archivo pom exacto
+        run: mvn -f vulncheckerbackend/pom.xml clean package -DskipTests -B
 
   # ETAPA 3: Despliegue con Aprobación
   deploy:
