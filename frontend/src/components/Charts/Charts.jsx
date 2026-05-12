@@ -7,7 +7,6 @@ import {
     ResponsiveContainer,
     Tooltip,
 } from 'recharts';
-import { buildApiUrl } from '../../config/api';
 import './Charts.css';
 
 const CHART_COLORS = [
