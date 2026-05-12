@@ -53,12 +53,17 @@ jobs:
   # ETAPA 3: Despliegue con Aprobación
   deploy:
     name: Despliegue en Dokploy
-    needs: build  # Esto bloquea el despliegue si SonarQube falla
+    needs: build
     runs-on: ubuntu-latest
-    environment: production
+    environment: production # Esto activa el botón de aprobación manual
     steps:
-      - name: Llamar a Webhook de Dokploy
+      - name: Trigger Deployment via API
         run: |
-          curl -L -X POST "${{ secrets.DOKPLOY_WEBHOOK_URL }} \
-          -H "Content-Type: application/json" \
-          -d "{\"branch\": \"main\"}"
+          curl -X 'POST' \
+            'http://157.230.177.115:3000/api/application.deploy' \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H 'x-api-key: ${{ secrets.DOKPLOY_TOKEN }}' \
+            -d '{
+            "applicationId": "${{ secrets.DOKPLOY_APP_ID }}"
+          }'
