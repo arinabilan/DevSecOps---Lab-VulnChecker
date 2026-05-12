@@ -1,5 +1,5 @@
 # VulnChecker — Infraestructura y Endpoints
-#### cambio para probar despliegue
+#### cambio
 ## Estado actual
 
 | Componente | Estado | Detalle |
