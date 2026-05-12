@@ -1,5 +1,5 @@
 # VulnChecker — Infraestructura y Endpoints
-#### cambio
+#### cambio para revisar si funciona pipeline
 ## Estado actual
 
 | Componente | Estado | Detalle |
