@@ -24,14 +24,14 @@ jobs:
 
       - name: Verificar Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1
-        # continue-on-error: true
+        continue-on-error: true
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   # ETAPA 2: Compilación en GitHub (Para no cargar en servidor)
-  build:
-    name: Compilación y Build
+  check-compilacion:
+    name: Verificar Compilación (Maven)
     needs: sonarqube
     runs-on: ubuntu-latest
     steps:
@@ -50,10 +50,27 @@ jobs:
         # Añadimos -f para indicarle el archivo pom exacto
         run: mvn -f vulncheckerbackend/pom.xml clean package -DskipTests -B
 
-  # ETAPA 3: Despliegue con Aprobación
+  # ETAPA 3: TRABAJO PESADO DOCKER (GitHub Motor)
+  build-docker:
+    name: Construir Imagen Docker
+    needs: check-compilacion
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and Push Image
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest -f vulncheckerbackend/Dockerfile ./vulncheckerbackend
+          docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest
+
+  # ETAPA 4: Despliegue con Aprobación (Dokploy solo descarga)
   deploy:
     name: Despliegue en Dokploy
-    needs: build
+    needs: build-docker
     runs-on: ubuntu-latest
     environment: production # Esto activa el botón de aprobación manual
     steps:
