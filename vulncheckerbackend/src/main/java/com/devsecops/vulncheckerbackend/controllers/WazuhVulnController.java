@@ -139,6 +139,7 @@ public class WazuhVulnController {
             @RequestHeader("Authorization") String auth) throws Exception {
 
         return ResponseEntity.ok(
+                println("Obteniendo resumen de vulnerabilidades para host: " + sshHost);
                 wazuhService.getVulnerabilitiesSummary(creds(sshHost, sshUser, sshPassword, auth))
         );
     }
@@ -147,7 +148,7 @@ public class WazuhVulnController {
     @PostMapping("/consume")
 	public ResponseEntity<Map<String, Object>> consumeAll(
 			@RequestBody VulnerabilityRequest request,
-			@RequestHeader("Authorization") String auth) {
+			@RequestHeader("Authoconsumrization") String auth) {
 
 		InfrastructureCredentialEntity credEntity = infraRepo.findById(request.getInfrastructureCredentialId())
 				.orElseThrow(() -> new RuntimeException("Credencial no encontrada"));
