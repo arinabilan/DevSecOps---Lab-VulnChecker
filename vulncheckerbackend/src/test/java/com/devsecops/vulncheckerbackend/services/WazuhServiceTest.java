@@ -2,6 +2,8 @@ package com.devsecops.vulncheckerbackend.services;
 
 import com.devsecops.vulncheckerbackend.config.SshTunnelManager;
 import com.devsecops.vulncheckerbackend.dto.WazuhCredentials;
+import com.devsecops.vulncheckerbackend.entities.AgentEntity;
+import com.devsecops.vulncheckerbackend.repositories.AgentRepository;
 import com.devsecops.vulncheckerbackend.repositories.VulnerabilityRepository;
 import com.devsecops.vulncheckerbackend.repositories.VulnerabilitySnapshotRepository;
 import com.jcraft.jsch.Session;
@@ -20,6 +22,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -42,6 +45,12 @@ class WazuhServiceTest {
     private VulnerabilitySnapshotRepository snapshotRepository;
 
     @Mock
+    private AgentRepository agentRepository;
+
+    @Mock
+    private VulnerabilityTimelineService timelineService;
+
+    @Mock
     private Session session;
 
     private WazuhService service;
@@ -53,7 +62,8 @@ class WazuhServiceTest {
     @BeforeEach
     void setUp() {
         Executor directExecutor = Runnable::run;
-        service = new WazuhService(tunnelManager, restTemplate, vulnerabilityRepository, snapshotRepository, directExecutor);
+        service = new WazuhService(tunnelManager, restTemplate, vulnerabilityRepository,
+                snapshotRepository, agentRepository, timelineService, directExecutor);
     }
 
     @Test
@@ -123,7 +133,12 @@ class WazuhServiceTest {
     void syncAllVulnerabilitiesMasive_processesBatchAndStopsOnEmptyPage() throws Exception {
         when(tunnelManager.openTunnel("10.0.0.1", 22, "root", "ssh-pass")).thenReturn(session);
         when(tunnelManager.getLocalPort()).thenReturn(9201);
-        when(vulnerabilityRepository.existsByCveAndAgentIdAndPackageName("CVE-2026-2000", "001", "openssl")).thenReturn(false);
+        // Simular que el agente ya existe
+        AgentEntity agent = new AgentEntity();
+        agent.setId(100L);
+        agent.setWazuhAgentId("001");
+        when(agentRepository.findByWazuhAgentId("001")).thenReturn(Optional.of(agent));
+        when(vulnerabilityRepository.existsByCveAndAgentIdAndPackageName("CVE-2026-2000", 100L, "openssl")).thenReturn(false);
 
         Map<String, Object> firstPage = searchResponse(List.of(singleHit("CVE-2026-2000", "Critical", "001", "openssl", List.of(1700000002L, "def"))));
         Map<String, Object> emptyPage = searchResponse(List.of());
@@ -159,6 +174,7 @@ class WazuhServiceTest {
     }
 
     private static Map<String, Object> singleHit(String cve, String severity, String agentId, String pkg, List<Object> sortValues) {
+        // Estructura actualizada según el nuevo formato de Wazuh
         return Map.of(
                 "_source", Map.of(
                         "vulnerability", Map.of(
@@ -166,16 +182,28 @@ class WazuhServiceTest {
                                 "severity", severity,
                                 "score", Map.of("base", 8.4),
                                 "detected_at", "2026-01-10T10:00:00Z",
-                                "description", "Desc",
-                                "title", "Title"
+                                "under_evaluation", false
                         ),
-                        "agent", Map.of(
-                                "id", agentId,
-                                "name", "agent-" + agentId
+                        "wazuh", Map.of(
+                                "agent", Map.of(
+                                        "id", agentId,
+                                        "name", "agent-" + agentId,
+                                        "version", "v5.0.0",
+                                        "host", Map.of(
+                                                "os", Map.of(
+                                                        "name", "Ubuntu",
+                                                        "platform", "linux",
+                                                        "type", "linux",
+                                                        "full", "Ubuntu 24.04"
+                                                )
+                                        )
+                                )
                         ),
                         "package", Map.of(
                                 "name", pkg,
-                                "version", "1.0.0"
+                                "version", "1.0.0",
+                                "type", "deb",
+                                "description", "Package description"
                         )
                 ),
                 "sort", sortValues
