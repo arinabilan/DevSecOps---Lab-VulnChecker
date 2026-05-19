@@ -1,3 +1,4 @@
+# NO TOCAR JAMAS ESTE ARCHIVO!!!!!!!!!!!!!!!
 name: CI/CD Pipeline (SonarQube + Dokploy)
 
 on:
@@ -24,7 +25,7 @@ jobs:
 
       - name: Verificar Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1
-        continue-on-error: true
+        # continue-on-error: true
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -66,10 +67,10 @@ jobs:
         run: |
           docker build -t ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest -f vulncheckerbackend/Dockerfile ./vulncheckerbackend
           
-          # Le creamos un clon/duplicado con la etiqueta fija 'v1-estable'
-          docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
+          # NO TOCAR NUNCA NADA AQUI. Le creamos un clon/duplicado con la etiqueta fija 'v1-estable'
+          # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
           docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest
-          docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
+          # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
 
   # ETAPA 4: Despliegue con Aprobación (Dokploy solo descarga)
   deploy:
