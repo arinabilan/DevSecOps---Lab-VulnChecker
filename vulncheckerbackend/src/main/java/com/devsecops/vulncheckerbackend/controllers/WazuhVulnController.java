@@ -21,10 +21,10 @@ public class WazuhVulnController {
 
     private final WazuhService wazuhService;
     private final InfrastructureCredentialRepository infraRepo;
-	private final VulnerabilityRepository vulnerabilityRepository;
+    private final VulnerabilityRepository vulnerabilityRepository;
     private static final Logger log = LoggerFactory.getLogger(WazuhVulnController.class);
 
-    public WazuhVulnController(WazuhService wazuhService, 
+    public WazuhVulnController(WazuhService wazuhService,
                                InfrastructureCredentialRepository infraRepo,
                                VulnerabilityRepository vulnerabilityRepository) {
         this.wazuhService = wazuhService;
@@ -33,13 +33,8 @@ public class WazuhVulnController {
     }
 
     // ─── Helper ──────────────────────────────────────────────────────────────
-
-    private WazuhCredentials creds(String sshHost, String sshUser, String sshPassword,
-                                   String authHeader) {
-        // Extrae user:pass del header "Basic base64..."
-        String decoded = new String(Base64.getDecoder().decode(
-                authHeader.replace("Basic ", "").trim()
-        ));
+    private WazuhCredentials creds(String sshHost, String sshUser, String sshPassword, String authHeader) {
+        String decoded = new String(Base64.getDecoder().decode(authHeader.replace("Basic ", "").trim()));
         String[] parts = decoded.split(":", 2);
         return new WazuhCredentials(sshHost, sshUser, sshPassword, parts[0], parts[1]);
     }
@@ -47,19 +42,21 @@ public class WazuhVulnController {
     // ─── 1. Todas (paginadas) ─────────────────────────────────────────────────
     @GetMapping("/{sshHost}/{sshUser}/{sshPassword}/all")
     public ResponseEntity<Map<String, Object>> getAllLegacy(
-            @PathVariable String sshHost, @PathVariable String sshUser, @PathVariable String sshPassword,
+            @PathVariable String sshHost,
+            @PathVariable String sshUser,
+            @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth) throws Exception {
         return ResponseEntity.ok(wazuhService.getAllVulnerabilities(creds(sshHost, sshUser, sshPassword, auth), 100, 0));
     }
 
-	@GetMapping("/count-local")
-	public ResponseEntity<Map<String, Long>> getLocalCount() {
-		long count = vulnerabilityRepository.count();
-		log.info("Consulta de conteo local: {}", count);
-		return ResponseEntity.ok(Map.of("count", count));
-	}
-    
-	// ─── 2. Top N ─────────────────────────────────────────────────────────────
+    @GetMapping("/count-local")
+    public ResponseEntity<Map<String, Long>> getLocalCount() {
+        long count = vulnerabilityRepository.count();
+        log.info("Consulta de conteo local: {}", count);
+        return ResponseEntity.ok(Map.of("count", count));
+    }
+
+    // ─── 2. Top N ─────────────────────────────────────────────────────────────
     @GetMapping("/{sshHost}/{sshUser}/{sshPassword}/top/{limit}")
     public ResponseEntity<Map<String, Object>> getTop(
             @PathVariable String sshHost,
@@ -67,10 +64,7 @@ public class WazuhVulnController {
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth,
             @PathVariable int limit) throws Exception {
-
-        return ResponseEntity.ok(
-                wazuhService.getTopVulnerabilities(creds(sshHost, sshUser, sshPassword, auth), limit)
-        );
+        return ResponseEntity.ok(wazuhService.getTopVulnerabilities(creds(sshHost, sshUser, sshPassword, auth), limit));
     }
 
     // ─── 3. Críticas ──────────────────────────────────────────────────────────
@@ -80,10 +74,7 @@ public class WazuhVulnController {
             @PathVariable String sshUser,
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth) throws Exception {
-
-        return ResponseEntity.ok(
-                wazuhService.getCriticalVulnerabilities(creds(sshHost, sshUser, sshPassword, auth))
-        );
+        return ResponseEntity.ok(wazuhService.getCriticalVulnerabilities(creds(sshHost, sshUser, sshPassword, auth)));
     }
 
     // ─── 4. Por severidad ─────────────────────────────────────────────────────
@@ -95,10 +86,7 @@ public class WazuhVulnController {
             @RequestHeader("Authorization") String auth,
             @PathVariable String severity,
             @RequestParam(defaultValue = "100") int limit) throws Exception {
-
-        return ResponseEntity.ok(
-                wazuhService.getVulnerabilitiesBySeverity(creds(sshHost, sshUser, sshPassword, auth), severity, limit)
-        );
+        return ResponseEntity.ok(wazuhService.getVulnerabilitiesBySeverity(creds(sshHost, sshUser, sshPassword, auth), severity, limit));
     }
 
     // ─── 5. Por CVE ───────────────────────────────────────────────────────────
@@ -109,10 +97,7 @@ public class WazuhVulnController {
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth,
             @PathVariable String cve) throws Exception {
-
-        return ResponseEntity.ok(
-                wazuhService.getVulnerabilitiesByCve(creds(sshHost, sshUser, sshPassword, auth), cve)
-        );
+        return ResponseEntity.ok(wazuhService.getVulnerabilitiesByCve(creds(sshHost, sshUser, sshPassword, auth), cve));
     }
 
     // ─── 6. Por agente ────────────────────────────────────────────────────────
@@ -124,10 +109,7 @@ public class WazuhVulnController {
             @RequestHeader("Authorization") String auth,
             @PathVariable String agentId,
             @RequestParam(defaultValue = "100") int limit) throws Exception {
-
-        return ResponseEntity.ok(
-                wazuhService.getVulnerabilitiesByAgent(creds(sshHost, sshUser, sshPassword, auth), agentId, limit)
-        );
+        return ResponseEntity.ok(wazuhService.getVulnerabilitiesByAgent(creds(sshHost, sshUser, sshPassword, auth), agentId, limit));
     }
 
     // ─── 7. Resumen ───────────────────────────────────────────────────────────
@@ -137,57 +119,58 @@ public class WazuhVulnController {
             @PathVariable String sshUser,
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth) throws Exception {
-
-        return ResponseEntity.ok(
-                wazuhService.getVulnerabilitiesSummary(creds(sshHost, sshUser, sshPassword, auth))
-        );
+        return ResponseEntity.ok(wazuhService.getVulnerabilitiesSummary(creds(sshHost, sshUser, sshPassword, auth)));
     }
 
-	// ─── 8. Sincronización masiva (POST) ─────────────────────────────────────
+    // ─── 8. Sincronización masiva (POST) ─────────────────────────────────────
     @PostMapping("/consume")
-	public ResponseEntity<Map<String, Object>> consumeAll(
-			@RequestBody VulnerabilityRequest request,
-			@RequestHeader("Authorizacion") String auth) {
+    public ResponseEntity<Map<String, Object>> consumeAll(
+            @RequestBody VulnerabilityRequest request,
+            @RequestHeader("Authorization") String auth) {   // ← CORREGIDO: ahora es "Authorization"
 
-		InfrastructureCredentialEntity credEntity = infraRepo.findById(request.getInfrastructureCredentialId())
-				.orElseThrow(() -> new RuntimeException("Credencial no encontrada"));
+        log.info(">>> consumeAll llamado con ID: {}", request.getInfrastructureCredentialId());
 
-		WazuhCredentials credentials = new WazuhCredentials(
-				request.getIp(),
-				credEntity.getSshUser(),
-				credEntity.getSshPassword(),
-				credEntity.getWazuhUser(),
-				credEntity.getWazuhPassword()
-		);
+        InfrastructureCredentialEntity credEntity = infraRepo.findById(request.getInfrastructureCredentialId())
+                .orElseThrow(() -> new RuntimeException("Credencial no encontrada"));
 
-		// Ejecución asíncrona delegada al servicio
-		wazuhService.syncAllVulnerabilitiesMasive(credentials);
+        WazuhCredentials credentials = new WazuhCredentials(
+                request.getIp(),
+                credEntity.getSshUser(),
+                credEntity.getSshPassword(),
+                credEntity.getWazuhUser(),
+                credEntity.getWazuhPassword()
+        );
 
-		return ResponseEntity.ok(Map.of(
-			"status", "processing",
-			"message", "Sincronización de gran volumen iniciada. Esto puede tardar varios minutos."
-		));
-	}
-	
-	@PostMapping("/remote-count")
-	public ResponseEntity<Map<String, Long>> getRemoteCount(@RequestBody VulnerabilityRequest request) throws Exception {
-		InfrastructureCredentialEntity credEntity = infraRepo.findById(request.getInfrastructureCredentialId())
-				.orElseThrow(() -> new RuntimeException("Credencial no encontrada"));
+        log.info(">>> Llamando a syncAllVulnerabilitiesMasive para IP: {}", request.getIp());
+        wazuhService.syncAllVulnerabilitiesMasive(credentials);
+        log.info(">>> syncAllVulnerabilitiesMasive invocado (asíncrono)");
 
-		WazuhCredentials credentials = new WazuhCredentials(
-				request.getIp(), credEntity.getSshUser(), credEntity.getSshPassword(),
-				credEntity.getWazuhUser(), credEntity.getWazuhPassword()
-		);
+        return ResponseEntity.ok(Map.of(
+                "status", "processing",
+                "message", "Sincronización de gran volumen iniciada. Esto puede tardar varios minutos."
+        ));
+    }
 
-		long total = wazuhService.getRemoteTotalCount(credentials);
-		return ResponseEntity.ok(Map.of("total", total));
-	}
+    @PostMapping("/remote-count")
+    public ResponseEntity<Map<String, Long>> getRemoteCount(@RequestBody VulnerabilityRequest request) throws Exception {
+        InfrastructureCredentialEntity credEntity = infraRepo.findById(request.getInfrastructureCredentialId())
+                .orElseThrow(() -> new RuntimeException("Credencial no encontrada"));
 
-	// ─── Manejo de errores ────────────────────────────────────────────────────
+        WazuhCredentials credentials = new WazuhCredentials(
+                request.getIp(), credEntity.getSshUser(), credEntity.getSshPassword(),
+                credEntity.getWazuhUser(), credEntity.getWazuhPassword()
+        );
+
+        long total = wazuhService.getRemoteTotalCount(credentials);
+        return ResponseEntity.ok(Map.of("total", total));
+    }
+
+    // ─── Manejo de errores ────────────────────────────────────────────────────
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleError(Exception e) {
+        log.error("Excepción no capturada: ", e);
         String customMessage = e.getMessage();
-        
+
         if (e.getMessage() != null && e.getMessage().contains("timeout: socket is not established")) {
             customMessage = "No se pudo establecer conexión SSH (Timeout). Verifica que la IP sea correcta y el puerto 22 esté abierto.";
         } else if (e.getMessage() != null && e.getMessage().contains("Auth fail")) {
