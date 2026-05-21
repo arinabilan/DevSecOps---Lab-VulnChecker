@@ -46,7 +46,7 @@ jobs:
 
       - name: Verificar Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1
-        continue-on-error: true
+        # continue-on-error: true
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -79,7 +79,7 @@ jobs:
     name: Despliegue en Dokploy
     needs: build-docker
     runs-on: ubuntu-latest
-    # environment: Production # Esto activa el botón de aprobación manual
+    environment: Production # Esto activa el botón de aprobación manual
     steps:
       - name: Trigger Deployment via API
         run: |
