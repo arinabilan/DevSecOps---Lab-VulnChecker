@@ -25,6 +25,7 @@ public final class TestDataFactory {
         user.setMaternalLastName("Usach");
         user.setEmail("admin.seguridad@usach.cl");
         user.setPassword("admin123");
+        user.setActive(true);  // <-- NUEVO: usuario activo por defecto en pruebas
         return user;
     }
 
@@ -52,10 +53,8 @@ public final class TestDataFactory {
     public static VulnerabilityEntity vulnerability(Long id) {
         VulnerabilityEntity entity = new VulnerabilityEntity();
         entity.setId(id);
-        entity.setAgentId("001");
-        entity.setAgentName("agent-001");
+        entity.setAgentId(100L);
         entity.setCve("CVE-2026-0001");
-        entity.setTitle("Example vuln");
         entity.setDescription("Example description");
         entity.setSeverity("High");
         entity.setCvss3Score(8.1);
@@ -63,13 +62,15 @@ public final class TestDataFactory {
         entity.setPackageName("openssl");
         entity.setPackageVersion("1.0.2");
         entity.setDetectionTime(LocalDateTime.of(2026, 1, 10, 9, 30));
+        entity.setUnderEvaluation(false);
+        entity.setCtiReference(null);
+        entity.setPackageType("deb");
         return entity;
     }
 
-    public static VulnerabilitySnapshotEntity snapshot(String agentId, int critical, int high, int medium, int low) {
+    public static VulnerabilitySnapshotEntity snapshot(Long agentId, int critical, int high, int medium, int low) {
         VulnerabilitySnapshotEntity snapshot = new VulnerabilitySnapshotEntity();
         snapshot.setAgentId(agentId);
-        snapshot.setAgentName("agent-" + agentId);
         snapshot.setCriticalCount(critical);
         snapshot.setHighCount(high);
         snapshot.setMediumCount(medium);
@@ -77,6 +78,11 @@ public final class TestDataFactory {
         snapshot.setTotalCount(critical + high + medium + low);
         snapshot.setSnapshotDate(LocalDateTime.of(2026, 1, 10, 10, 0));
         return snapshot;
+    }
+
+    // Para mantener compatibilidad con tests antiguos que usen snapshot(String, ...)
+    public static VulnerabilitySnapshotEntity snapshot(String agentId, int critical, int high, int medium, int low) {
+        return snapshot(Long.parseLong(agentId), critical, high, medium, low);
     }
 
     public static ReportSignatureEntity reportSignature(String hash, String signature) {

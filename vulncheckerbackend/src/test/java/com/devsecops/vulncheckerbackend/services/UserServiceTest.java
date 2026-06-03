@@ -29,9 +29,10 @@ class UserServiceTest {
     private UserService userService;
 
     @Test
-    void login_returnsUser_whenEmailExistsAndPasswordMatches() {
+    void login_returnsUser_whenEmailExistsAndPasswordMatchesAndUserActive() {
         UserEntity user = TestDataFactory.user(1L);
         user.setPassword("encoded");
+        user.setActive(true); // <-- CRUCIAL
 
         when(userRepository.findByEmail("admin.seguridad@usach.cl")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("admin123", "encoded")).thenReturn(true);
@@ -46,6 +47,7 @@ class UserServiceTest {
     void login_returnsEmpty_whenPasswordDoesNotMatch() {
         UserEntity user = TestDataFactory.user(1L);
         user.setPassword("encoded");
+        user.setActive(true); // <-- CRUCIAL
 
         when(userRepository.findByEmail("admin.seguridad@usach.cl")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("bad-password", "encoded")).thenReturn(false);
@@ -66,8 +68,23 @@ class UserServiceTest {
     }
 
     @Test
+    void login_returnsEmpty_whenUserExistsButIsInactive() {
+        UserEntity user = TestDataFactory.user(1L);
+        user.setPassword("encoded");
+        user.setActive(false); // inactivo
+
+        when(userRepository.findByEmail("admin.seguridad@usach.cl")).thenReturn(Optional.of(user));
+        // No debería llamarse a passwordEncoder porque el filtro de active falla primero
+        Optional<UserEntity> result = userService.login("admin.seguridad@usach.cl", "admin123");
+
+        assertTrue(result.isEmpty());
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
     void save_encodesPasswordBeforePersisting() {
         UserEntity user = TestDataFactory.user(1L);
+        user.setPassword("admin123");
 
         when(passwordEncoder.encode("admin123")).thenReturn("encoded-pass");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
