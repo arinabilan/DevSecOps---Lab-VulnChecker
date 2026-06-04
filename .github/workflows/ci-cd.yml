@@ -38,6 +38,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # ---> AGREGAMOS ESTE PASO AQUÍ PARA EVITAR EL ERROR HTTP 403 <---
+      - name: Configurar JDK 21 para Sonar
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
       - name: Escaneo de SonarQube
         uses: SonarSource/sonarqube-scan-action@v6
         env:
