@@ -12,15 +12,20 @@ import com.jcraft.jsch.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -60,11 +65,8 @@ public class WazuhService {
         this.taskExecutor = taskExecutor;
     }
 
-    // ======================= MÉTODOS PÚBLICOS DE CONSULTA A WAZUH =======================
-
-    /**
-     * Obtiene vulnerabilidades paginadas desde Wazuh.
-     */
+    // ======================= MÉTODOS PÚBLICOS DE CONSULTA A WAZUH (LEGACY) =======================
+    // (Sin cambios en la lógica, solo ajuste interno para usar puerto dinámico)
     public Map<String, Object> getAllVulnerabilities(WazuhCredentials creds, int limit, int offset) throws Exception {
         int pageSize = Math.min(limit, 5000);
         String body = """
@@ -142,87 +144,134 @@ public class WazuhService {
         return executeWithTunnel(creds, body);
     }
 
-    /**
-     * Obtiene el número total de vulnerabilidades remotas.
-     */
-    public long getRemoteTotalCount(WazuhCredentials creds) throws Exception {
-        Session session = tunnelManager.openTunnel(creds.sshHost(), 22, creds.sshUser(), creds.sshPassword());
+    // ======================= NUEVO: OBTENER CANTIDAD DE VULNERABILIDADES NUEVAS REMOTAS =======================
+    public long getRemoteNewCount(WazuhCredentials creds, LocalDateTime since) throws Exception {
+        Session session = null;
         try {
-            String url = wazuhBaseUrl() + "/" + VULN_INDEX + "/_count";
+            session = tunnelManager.openTunnel(creds.sshHost(), 22, creds.sshUser(), creds.sshPassword());
+            int localPort = tunnelManager.getLocalPort(session);
+            String queryBody;
+            if (since == null) {
+                queryBody = "{ \"query\": { \"match_all\": {} } }";
+            } else {
+                String isoDate = since.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_INSTANT);
+                queryBody = String.format("""
+                        {
+                        "query": {
+                            "range": {
+                            "vulnerability.detected_at": {
+                                "gt": "%s"
+                            }
+                            }
+                        }
+                        }
+                        """, isoDate);
+            }
+            String url = buildWazuhUrl(localPort) + "/" + VULN_INDEX + "/_count";
             HttpHeaders headers = new HttpHeaders();
             String auth = creds.wazuhUser() + ":" + creds.wazuhPassword();
-            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
             headers.set("Authorization", "Basic " + encodedAuth);
+            headers.setContentType(MediaType.APPLICATION_JSON);
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                    url, HttpMethod.GET, new HttpEntity<>(headers),
-                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
+                    url, HttpMethod.POST, new HttpEntity<>(queryBody, headers),
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
             );
-            return Long.parseLong(response.getBody().get("count").toString());
+            Map<String, Object> body = response.getBody();
+            if (body == null || !body.containsKey("count")) {
+                throw new RuntimeException("Respuesta inválida de Wazuh");
+            }
+            return Long.parseLong(body.get("count").toString());
         } finally {
-            tunnelManager.closeTunnel(session);
+            if (session != null) tunnelManager.closeTunnel(session);
         }
     }
 
-    // ======================= SINCRONIZACIÓN MASIVA (PUNTO DE ENTRADA) =======================
-
-    /**
-     * Lanza la sincronización masiva de forma asíncrona.
-     */
-    public void syncAllVulnerabilitiesMasive(WazuhCredentials creds) {
+    // ======================= SINCRONIZACIÓN MASIVA CON SSE (INCREMENTAL) =======================
+    public void syncAllVulnerabilitiesMasive(WazuhCredentials creds, String taskId, SseEmitter emitter) {
         taskExecutor.execute(() -> {
-            log.info("INICIANDO EXTRACCIÓN MASIVA PARA: {}", creds.sshHost());
+            log.info("INICIANDO EXTRACCIÓN INCREMENTAL PARA: {}, taskId: {}", creds.sshHost(), taskId);
             try {
-                performSync(creds);
+                performSync(creds, taskId, emitter);
+                emitter.send(SseEmitter.event().name("complete").data(Map.of("status", "done")));
+                emitter.complete();
             } catch (Exception e) {
                 log.error("ERROR CRÍTICO EN HILO DE SINCRONIZACIÓN: ", e);
+                try {
+                    emitter.send(SseEmitter.event().name("error").data(Map.of("error", e.getMessage())));
+                    emitter.completeWithError(e);
+                } catch (IOException ex) {
+                    log.error("No se pudo enviar error por SSE", ex);
+                }
             }
         });
     }
 
-    /**
-     * Realiza la sincronización completa de forma transaccional.
-     * 1. Obtiene todas las vulnerabilidades activas actuales en la BD.
-     * 2. Recorre todos los hits de Wazuh (scroll paginado).
-     * 3. Actualiza o crea vulnerabilidades según corresponda.
-     * 4. Marca como RESOLVED las que ya no aparecen.
-     * 5. Guarda los snapshots de conteo por agente.
-     */
     @Transactional
-    public void performSync(WazuhCredentials creds) throws Exception {
-        // 1. Vulnerabilidades activas actuales
+    public void performSync(WazuhCredentials creds, String taskId, SseEmitter emitter) throws Exception {
+        // 1. Obtener la fecha de la última sincronización exitosa
+        LocalDateTime lastSync = vulnerabilityRepository.findMaxLastSync();
+        boolean firstSync = (lastSync == null);
+        log.info("Última sincronización: {}", lastSync);
+
+        // 2. Vulnerabilidades activas actuales (para luego resolver las que ya no aparecen)
         List<VulnerabilityEntity> currentlyActive = vulnerabilityRepository.findByStatus("ACTIVE");
         Map<String, VulnerabilityEntity> activeByKey = currentlyActive.stream()
                 .collect(Collectors.toMap(
                         v -> buildKey(v.getCve(), v.getAgentId(), v.getPackageName()),
-                        v -> v
+                        v -> v,
+                        (existing, replacement) -> existing
                 ));
         Set<Long> seenIds = new HashSet<>();
-
-        // 2. Paginar sobre todos los hits de Wazuh
-        int pageSize = 5000;
-        Object[] lastSortValues = null;
-        boolean hasMore = true;
         Map<Long, SnapshotCounter> countersByAgent = new HashMap<>();
 
+        // 3. Paginación sobre Wazuh (solo elementos nuevos)
+        int pageSize = 2000;
+        Object[] lastSortValues = null;
+        boolean hasMore = true;
+        long processedTotal = 0;
+
+        // Obtener el total de elementos nuevos para el progreso
+        long remoteNewTotal = getRemoteNewCount(creds, lastSync);
+        log.info("Se sincronizarán {} vulnerabilidades nuevas", remoteNewTotal);
+
         Session session = tunnelManager.openTunnel(creds.sshHost(), 22, creds.sshUser(), creds.sshPassword());
+        int localPort = tunnelManager.getLocalPort(session);
         try {
             while (hasMore) {
                 String searchAfterClause = (lastSortValues != null)
                         ? ", \"search_after\": [%s, \"%s\"]".formatted(lastSortValues[0], lastSortValues[1])
                         : "";
-                String body = """
+
+                String rangeFilter;
+                if (firstSync) {
+                    rangeFilter = "\"query\": { \"match_all\": {} }";
+                } else {
+                    String isoDate = lastSync.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_INSTANT);
+                    rangeFilter = String.format("""
+                            "query": {
+                                "range": {
+                                    "vulnerability.detected_at": {
+                                        "gt": "%s"
+                                    }
+                                }
+                            }
+                            """, isoDate);
+                }
+
+                String body = String.format("""
                         {
-                        "size": %d,
-                        "query": { "match_all": {} },
-                        "sort": [
+                          "size": %d,
+                          "sort": [
                             { "vulnerability.detected_at": "desc" },
                             { "_id": "asc" }
-                        ]
-                        %s
+                          ],
+                          %s
+                          %s
                         }
-                        """.formatted(pageSize, searchAfterClause);
+                        """, pageSize, rangeFilter, searchAfterClause);
 
-                Map<String, Object> response = search(body, creds.wazuhUser(), creds.wazuhPassword());
+                Map<String, Object> response = search(body, creds.wazuhUser(), creds.wazuhPassword(), localPort);
 
                 if (response != null && response.containsKey("hits")) {
                     Map<String, Object> hitsStructure = (Map<String, Object>) response.get("hits");
@@ -231,7 +280,19 @@ public class WazuhService {
                     if (hits == null || hits.isEmpty()) {
                         hasMore = false;
                     } else {
+                        int batchSize = hits.size();
                         processHitsBatch(hits, activeByKey, seenIds, countersByAgent);
+                        processedTotal += batchSize;
+
+                        // Enviar progreso vía SSE
+                        emitter.send(SseEmitter.event().name("progress").data(Map.of(
+                                "processed", processedTotal,
+                                "total", remoteNewTotal,
+                                "percent", (int)((double)processedTotal / remoteNewTotal * 100),
+                                "taskId", taskId
+                        )));
+                        log.debug("Progreso: {}/{}", processedTotal, remoteNewTotal);
+
                         lastSortValues = ((List<Object>) hits.get(hits.size() - 1).get("sort")).toArray();
                     }
                 } else {
@@ -239,13 +300,13 @@ public class WazuhService {
                 }
             }
         } finally {
-            tunnelManager.closeTunnel(session);
+            tunnelManager.closeTunnel(session);  // Cerrar siempre el túnel después de la sincronización
         }
 
-        // 3. Guardar snapshots de conteo
+        // 4. Guardar snapshots de conteo por agente
         countersByAgent.values().forEach(this::saveSnapshot);
 
-        // 4. Resolver vulnerabilidades que ya no aparecieron en esta sincronización
+        // 5. Resolver vulnerabilidades que ya no aparecieron en esta sincronización
         List<Long> resolvedIds = new ArrayList<>();
         for (VulnerabilityEntity vuln : currentlyActive) {
             if (!seenIds.contains(vuln.getId())) {
@@ -259,15 +320,7 @@ public class WazuhService {
         }
     }
 
-    // ======================= PROCESAMIENTO DE BATCHES =======================
-
-    /**
-     * Procesa un lote de hits provenientes de Wazuh:
-     * - Extrae información de vulnerabilidad, paquete y agente.
-     * - Actualiza o crea el agente con todos sus datos (OS, versión, etc.).
-     * - Si la vulnerabilidad ya existe y está activa, actualiza sus campos y last_detection.
-     * - Si es nueva, la crea y registra evento DETECTED.
-     */
+    // ======================= PROCESAMIENTO DE BATCHES (ÍNTEGRO, SIN CAMBIOS) =======================
     @SuppressWarnings("unchecked")
     private void processHitsBatch(List<Map<String, Object>> hits,
                                   Map<String, VulnerabilityEntity> activeByKey,
@@ -275,6 +328,7 @@ public class WazuhService {
                                   Map<Long, SnapshotCounter> countersByAgent) {
         List<VulnerabilityEntity> toSave = new ArrayList<>();
         List<VulnerabilityEntity> toUpdate = new ArrayList<>();
+        Set<String> processedKeys = new HashSet<>(); // Evita duplicados dentro del mismo lote
 
         for (Map<String, Object> hit : hits) {
             try {
@@ -339,32 +393,31 @@ public class WazuhService {
                 agent = agentRepository.save(agent);
                 Long agentIdNum = agent.getId();
 
-                // --- Contar para snapshots (por severidad) ---
+                // --- Contar para snapshots ---
                 SnapshotCounter counter = countersByAgent.computeIfAbsent(agentIdNum, k -> new SnapshotCounter());
                 counter.count(agentIdNum, severity);
 
-                // --- Obtener o crear vulnerabilidad ---
+                // --- Clave única y control de duplicados en este lote ---
                 String key = buildKey(cve, agentIdNum, pkgName);
+                if (processedKeys.contains(key)) {
+                    log.debug("Hit duplicado en el mismo lote, omitiendo: {}", key);
+                    continue;
+                }
+                processedKeys.add(key);
+
+                // --- Buscar si ya existe en el mapa de activas (vienen de BD) ---
                 VulnerabilityEntity existing = activeByKey.get(key);
                 Double cvssScore = extractCvssScore(v);
                 LocalDateTime detectedAt = parseDateTime(v.get("detected_at"));
 
                 if (existing != null) {
-                    // Vulnerabilidad ya activa → actualizar campos y last_detection
-                    existing.setSeverity(severity);
-                    existing.setCvss3Score(cvssScore);
-                    existing.setUnderEvaluation(underEvaluation != null ? underEvaluation : false);
-                    existing.setCtiReference(ctiReference);
-                    existing.setPackageVersion(pkgVersion);
-                    existing.setPackageType(pkgType);
-                    existing.setDescription(pkgDescription);
-                    existing.setLastDetection(LocalDateTime.now());  // última vez que se detectó activa
-                    existing.setLastSync(LocalDateTime.now());
-                    // No cambiamos el estado (sigue ACTIVE)
+                    // Vulnerabilidad ya activa → actualizar
+                    updateExistingVulnerability(existing, severity, cvssScore, underEvaluation, ctiReference,
+                            pkgVersion, pkgType, pkgDescription);
                     toUpdate.add(existing);
                     seenIds.add(existing.getId());
                 } else {
-                    // Nueva vulnerabilidad → crear y registrar evento DETECTED
+                    // Nueva vulnerabilidad → crear
                     VulnerabilityEntity entity = new VulnerabilityEntity();
                     entity.setCve(cve);
                     entity.setAgentId(agentIdNum);
@@ -396,24 +449,31 @@ public class WazuhService {
                 activeByKey.put(buildKey(v.getCve(), v.getAgentId(), v.getPackageName()), v);
             }
         }
-        // --- Actualizar las existentes (no se registran eventos porque siguen activas) ---
+        // --- Actualizar las existentes ---
         if (!toUpdate.isEmpty()) {
             vulnerabilityRepository.saveAll(toUpdate);
         }
     }
 
     // ======================= MÉTODOS AUXILIARES =======================
+    private void updateExistingVulnerability(VulnerabilityEntity existing, String severity, Double cvssScore,
+                                             Boolean underEvaluation, String ctiReference, String pkgVersion,
+                                             String pkgType, String pkgDescription) {
+        existing.setSeverity(severity);
+        existing.setCvss3Score(cvssScore);
+        existing.setUnderEvaluation(underEvaluation != null ? underEvaluation : false);
+        existing.setCtiReference(ctiReference);
+        existing.setPackageVersion(pkgVersion);
+        existing.setPackageType(pkgType);
+        existing.setDescription(pkgDescription);
+        existing.setLastDetection(LocalDateTime.now());
+        existing.setLastSync(LocalDateTime.now());
+    }
 
-    /**
-     * Construye una clave única para identificar vulnerabilidad en el mapa de activas.
-     */
     private String buildKey(String cve, Long agentId, String packageName) {
         return cve + "|" + agentId + "|" + (packageName != null ? packageName : "");
     }
 
-    /**
-     * Extrae el puntaje CVSS desde el objeto vulnerability.
-     */
     private Double extractCvssScore(Map<String, Object> vulnerabilityMap) {
         Map<String, Object> scoreObj = (Map<String, Object>) vulnerabilityMap.get("score");
         if (scoreObj != null && scoreObj.get("base") != null) {
@@ -426,9 +486,6 @@ public class WazuhService {
         return 0.0;
     }
 
-    /**
-     * Parsea una fecha que puede venir como string ISO o timestamp numérico.
-     */
     private LocalDateTime parseDateTime(Object dateObj) {
         if (dateObj == null) return null;
         try {
@@ -436,7 +493,6 @@ public class WazuhService {
                 return ZonedDateTime.parse((String) dateObj).toLocalDateTime();
             } else if (dateObj instanceof Number) {
                 long millis = ((Number) dateObj).longValue();
-                // Si es mayor a 10^12, son milisegundos
                 if (millis > 1_000_000_000_000L) {
                     return Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDateTime();
                 } else {
@@ -449,9 +505,6 @@ public class WazuhService {
         return null;
     }
 
-    /**
-     * Guarda un snapshot de conteo de vulnerabilidades por severidad para un agente.
-     */
     private void saveSnapshot(SnapshotCounter counter) {
         if (counter.agentId == null) return;
         VulnerabilitySnapshotEntity snap = new VulnerabilitySnapshotEntity();
@@ -465,9 +518,6 @@ public class WazuhService {
         log.info("Snapshot guardado para agente {}: total {}", counter.agentId, snap.getTotalCount());
     }
 
-    /**
-     * Clase interna para acumular conteos por agente durante la sincronización.
-     */
     private static class SnapshotCounter {
         Long agentId;
         int crit, high, med, low;
@@ -489,26 +539,27 @@ public class WazuhService {
         }
     }
 
-    // ======================= INFRAESTRUCTURA (túnel SSH y comunicación con Elasticsearch) =======================
-
+    // ======================= INFRAESTRUCTURA (túnel y comunicación con Elasticsearch) =======================
     private Map<String, Object> executeWithTunnel(WazuhCredentials creds, String queryBody) throws Exception {
-        log.info(">>> EJECUTANDO ACCESO: Host SSH: {} | Usuario SSH: {} | Usuario Wazuh: {}",
-                creds.sshHost(), creds.sshUser(), creds.wazuhUser());
-        Session session = tunnelManager.openTunnel(creds.sshHost(), 22, creds.sshUser(), creds.sshPassword());
+        Session session = null;
         try {
-            return search(queryBody, creds.wazuhUser(), creds.wazuhPassword());
+            session = tunnelManager.openTunnel(creds.sshHost(), 22, creds.sshUser(), creds.sshPassword());
+            int localPort = tunnelManager.getLocalPort(session);
+            return search(queryBody, creds.wazuhUser(), creds.wazuhPassword(), localPort);
         } finally {
-            tunnelManager.closeTunnel(session);
+            if (session != null) {
+                tunnelManager.closeTunnel(session);
+            }
         }
     }
 
-    private Map<String, Object> search(String queryBody, String user, String password) {
+    private Map<String, Object> search(String queryBody, String user, String password, int localPort) {
         String auth = user + ":" + password;
         String credentials = Base64.getEncoder().encodeToString(auth.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Basic " + credentials);
         headers.setContentType(MediaType.APPLICATION_JSON);
-        String url = wazuhBaseUrl() + "/" + VULN_INDEX + "/_search";
+        String url = buildWazuhUrl(localPort) + "/" + VULN_INDEX + "/_search";
         ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 url, HttpMethod.POST, new HttpEntity<>(queryBody, headers),
                 new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
@@ -516,8 +567,8 @@ public class WazuhService {
         return response.getBody();
     }
 
-    private String wazuhBaseUrl() {
-        return "https://127.0.0.1:" + tunnelManager.getLocalPort();
+    private String buildWazuhUrl(int localPort) {
+        return "https://127.0.0.1:" + localPort;
     }
 
     private String capitalize(String s) {

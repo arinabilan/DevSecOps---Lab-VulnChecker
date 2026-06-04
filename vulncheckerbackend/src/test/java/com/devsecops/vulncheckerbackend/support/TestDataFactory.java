@@ -25,6 +25,7 @@ public final class TestDataFactory {
         user.setMaternalLastName("Usach");
         user.setEmail("admin.seguridad@usach.cl");
         user.setPassword("admin123");
+        user.setActive(true);  // <-- NUEVO: usuario activo por defecto en pruebas
         return user;
     }
 
@@ -52,9 +53,8 @@ public final class TestDataFactory {
     public static VulnerabilityEntity vulnerability(Long id) {
         VulnerabilityEntity entity = new VulnerabilityEntity();
         entity.setId(id);
-        entity.setAgentId(100L);  // Cambiado a Long
+        entity.setAgentId(100L);
         entity.setCve("CVE-2026-0001");
-        // title ya no existe, eliminado
         entity.setDescription("Example description");
         entity.setSeverity("High");
         entity.setCvss3Score(8.1);
@@ -70,8 +70,7 @@ public final class TestDataFactory {
 
     public static VulnerabilitySnapshotEntity snapshot(Long agentId, int critical, int high, int medium, int low) {
         VulnerabilitySnapshotEntity snapshot = new VulnerabilitySnapshotEntity();
-        snapshot.setAgentId(agentId);   // Long
-        // agentName ya no existe, eliminado
+        snapshot.setAgentId(agentId);
         snapshot.setCriticalCount(critical);
         snapshot.setHighCount(high);
         snapshot.setMediumCount(medium);
@@ -83,7 +82,6 @@ public final class TestDataFactory {
 
     // Para mantener compatibilidad con tests antiguos que usen snapshot(String, ...)
     public static VulnerabilitySnapshotEntity snapshot(String agentId, int critical, int high, int medium, int low) {
-        // Convertir String a Long (asumiendo que el String es un número)
         return snapshot(Long.parseLong(agentId), critical, high, medium, low);
     }
 
