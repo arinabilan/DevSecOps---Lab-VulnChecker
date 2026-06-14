@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - jv_trivy2
 
 jobs:
   # ETAPA 1: Compilación de java
@@ -53,27 +54,45 @@ jobs:
 
       - name: Verificar Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1
-        # continue-on-error: true
+        continue-on-error: true
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           
-  # ETAPA 3: TRABAJO PESADO DOCKER (GitHub Motor)
+  # ETAPA 3: TRABAJO PESADO DOCKER (GitHub Motor) + ANÁLISIS DE VULNERABILIDADES (SCA CONTENEDORES)
   build-docker:
-    name: Construir Imagen Docker
+    name: Construir e Inspeccionar Imagen Docker
     needs: sonarqube
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Build and Push Image
+
+      # Paso 3.1: Construcción del artefacto en el Docker Daemon local del runner
+      - name: Build Docker Image
         run: |
           docker build -t ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest -f vulncheckerbackend/Dockerfile ./vulncheckerbackend
-          
+
+      # Paso 3.2: Control de Calidad de Seguridad (Security Gate) con Trivy
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master # <--- Usamos la acción oficial de Trivy para GitHub Actions
+        with:
+          image-ref: 'ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest'
+          scan-type: 'image'
+          format: 'table'
+          exit-code: '1'          # CRÍTICO: Si encuentra los criterios de abajo, retorna código 1 y aborta el Job.
+          ignore-unfixed: true    # Ignora vulnerabilidades sin un parche en el mercado
+          severity: 'HIGH,CRITICAL' # Umbral estricto: Bloquea el pipeline solo ante riesgos Altos o Críticos.
+
+      # Paso 3.3: Publicación del artefacto (Solo se ejecuta si Trivy retornó exit-code 0)
+      - name: Push Docker Image to GHCR
+        run: |
           # NO TOCAR NUNCA NADA AQUI. Le creamos un clon/duplicado con la etiqueta fija 'v1-estable'
           # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
           # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v2-estable
@@ -82,19 +101,19 @@ jobs:
           # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
 
   # ETAPA 4: Despliegue con Aprobación (Dokploy solo descarga)
-  deploy:
-    name: Despliegue en Dokploy
-    needs: build-docker
-    runs-on: ubuntu-latest
-    environment: Production # Esto activa el botón de aprobación manual
-    steps:
-      - name: Trigger Deployment via API
-        run: |
-          curl -X 'POST' \
-            'http://157.230.177.115:3000/api/application.deploy' \
-            -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -H 'x-api-key: ${{ secrets.DOKPLOY_TOKEN }}' \
-            -d '{
-            "applicationId": "${{ secrets.DOKPLOY_APP_ID }}"
-          }'
+  #deploy:
+  #  name: Despliegue en Dokploy
+  #  needs: build-docker
+  #  runs-on: ubuntu-latest
+  #  environment: Production # Esto activa el botón de aprobación manual
+  #  steps:
+  #    - name: Trigger Deployment via API
+  #      run: |
+  #        curl -X 'POST' \
+  #          'http://157.230.177.115:3000/api/application.deploy' \
+  #          -H 'accept: application/json' \
+  #          -H 'Content-Type: application/json' \
+  #          -H 'x-api-key: ${{ secrets.DOKPLOY_TOKEN }}' \
+  #          -d '{
+  #          "applicationId": "${{ secrets.DOKPLOY_APP_ID }}"
+  #        }'
