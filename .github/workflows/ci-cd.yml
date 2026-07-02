@@ -95,7 +95,9 @@ jobs:
           # NO TOCAR NUNCA NADA AQUI. Le creamos un clon/duplicado con la etiqueta fija 'v1-estable'
           # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
           # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v2-estable
+          # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v3-estable
           docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest
+          # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v3-estable
           # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v2-estable
           # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
 
