@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 public class WazuhService {
 
     private static final Logger log = LoggerFactory.getLogger(WazuhService.class);
-    private static final String VULN_INDEX = "wazuh-states-vulnerabilities";
+    private static final String VULN_INDEX = "wazuh-states-vulnerabilities*";
 
     private final SshTunnelManager tunnelManager;
     private final RestTemplate restTemplate;
@@ -334,9 +334,16 @@ public class WazuhService {
             try {
                 Map<String, Object> source = (Map<String, Object>) hit.get("_source");
                 Map<String, Object> v = (Map<String, Object>) source.get("vulnerability");
-                Map<String, Object> wazuh = (Map<String, Object>) source.get("wazuh");
-                Map<String, Object> agentMap = (Map<String, Object>) wazuh.get("agent");
                 Map<String, Object> p = (Map<String, Object>) source.get("package");
+
+                // SOPORTE HÍBRIDO: Buscar 'agent' en la raíz (Wazuh nuevo) o dentro de 'wazuh' (Wazuh viejo)
+                Map<String, Object> agentMap = (Map<String, Object>) source.get("agent");
+                if (agentMap == null) {
+                    Map<String, Object> wazuh = (Map<String, Object>) source.get("wazuh");
+                    if (wazuh != null) {
+                        agentMap = (Map<String, Object>) wazuh.get("agent");
+                    }
+                }
 
                 if (v == null || agentMap == null) {
                     log.warn("Hit sin vulnerability o wazuh.agent, omitido");
