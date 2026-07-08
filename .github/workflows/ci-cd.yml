@@ -1,3 +1,4 @@
+# NO TOCAR JAMAS ESTE ARCHIVO!!!!!!!!!!!!!!!
 name: CI/CD Pipeline (SonarQube + Dokploy)
 
 on:
@@ -6,33 +7,9 @@ on:
       - main
 
 jobs:
-  # ETAPA 1: Análisis de Calidad con Sonar
-  sonarqube:
-    name: Análisis de Código
-    runs-on: ubuntu-latest
-    steps:
-      - name: Descargar el código
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Escaneo de SonarQube
-        uses: SonarSource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      - name: Verificar Quality Gate
-        uses: SonarSource/sonarqube-quality-gate-action@v1
-        # continue-on-error: true
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-  # ETAPA 2: Compilación en GitHub (Para no cargar en servidor)
+  # ETAPA 1: Compilación de java
   check-compilacion:
     name: Verificar Compilación (Maven)
-    needs: sonarqube
     runs-on: ubuntu-latest
     steps:
       - name: Descargar el código
@@ -49,23 +26,83 @@ jobs:
         # Ejecutamos el empaquetado saltando tests para verificar que el código es válido
         # Añadimos -f para indicarle el archivo pom exacto
         run: mvn -f vulncheckerbackend/pom.xml clean package -DskipTests -B
-
-  # ETAPA 3: TRABAJO PESADO DOCKER (GitHub Motor)
-  build-docker:
-    name: Construir Imagen Docker
+        
+  # ETAPA 2: Análisis de Calidad con Sonar
+  sonarqube:
+    name: Análisis de Código
     needs: check-compilacion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ---> AGREGAMOS ESTE PASO AQUÍ PARA EVITAR EL ERROR HTTP 403 <---
+      - name: Configurar JDK 21 para Sonar
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Escaneo de SonarQube
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Verificar Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        # continue-on-error: true # comentar o descomentar segun se quiera bloquear el pipeline ante un fallo en el Quality Gate de Sonar
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          
+  # ETAPA 3: TRABAJO PESADO DOCKER (GitHub Motor) + ANÁLISIS DE VULNERABILIDADES (SCA CONTENEDORES)
+  build-docker:
+    name: Construir e Inspeccionar Imagen Docker
+    needs: sonarqube
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Build and Push Image
+
+      # Paso 3.1: Construcción del artefacto en el Docker Daemon local del runner
+      - name: Build Docker Image
         run: |
           docker build -t ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest -f vulncheckerbackend/Dockerfile ./vulncheckerbackend
+
+      # Paso 3.2: Control de Calidad de Seguridad (Security Gate) con Trivy
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master # <--- Usamos la acción oficial de Trivy para GitHub Actions
+        # continue-on-error: true
+        with:
+          image-ref: 'ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest'
+          scan-type: 'image'
+          format: 'table'
+          exit-code: '1' # '0' para pasar siempre, '1' para fallar si se detecta una vulnerabilidad específicada en severity
+          ignore-unfixed: true # Ignora vulnerabilidades sin un parche en el mercado
+          severity: 'CRITICAL' # Umbral estricto: Bloquea el pipeline solo ante riesgos Altos o Críticos.
+
+      # Paso 3.3: Publicación del artefacto (Solo se ejecuta si Trivy retornó exit-code 0)
+      - name: Push Docker Image to GHCR
+        run: |
+          # NO TOCAR NUNCA NADA AQUI. Le creamos un clon/duplicado con la etiqueta fija 'v1-estable'
+          # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
+          # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v2-estable
+          # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v3-estable
+          # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v4-estable
           docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest
+          # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v4-estable
+          # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v3-estable
+          # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v2-estable
+          # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v1-estable
 
   # ETAPA 4: Despliegue con Aprobación (Dokploy solo descarga)
   deploy:

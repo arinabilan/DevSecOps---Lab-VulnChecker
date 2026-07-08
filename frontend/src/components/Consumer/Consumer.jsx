@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Database, Plus, Trash2, ArrowLeft, Send, Loader2 } from 'lucide-react'; // Cambié ShieldCheck por Loader2 para el loading
+import { useState, useEffect, useRef } from 'react';
+import { Database, Plus, Trash2, ArrowLeft, Send, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { buildApiUrl } from '../../config/api';
 import './Consumer.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -10,42 +9,17 @@ const Consumer = () => {
     const navigate = useNavigate();
     const userId = localStorage.getItem('user_id');
     
-    const [servers, setServers] = useState([{ id: 1, ip: '', port: '', credentialId: '' }]);
+    const [servers, setServers] = useState([{ id: 1, ip: '', credentialId: '' }]);
     const [availableCredentials, setAvailableCredentials] = useState([]);
     const [nextServerId, setNextServerId] = useState(2);    
     const [loading, setLoading] = useState(false);
     const [progressCount, setProgressCount] = useState(0);
     const [totalTarget, setTotalTarget] = useState(0);
+    const [taskId, setTaskId] = useState(null);
+    const [notification, setNotification] = useState({ message: '', type: '' });
+    const eventSourceRef = useRef(null);
 
-    // Polling de progreso
-    useEffect(() => {
-        let interval;
-        if (loading) {
-            interval = setInterval(async () => {
-                try {
-                    const token = localStorage.getItem('token'); 
-                    const res = await fetch(`${API_BASE_URL}/api/vulns/count-local`, {
-                        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
-                    });
-
-                    if (res.ok) {
-                        const data = await res.json();
-                        setProgressCount(data.count); 
-                        
-                        // Si llegamos al objetivo, desactivamos el loading
-                        if (data.count >= totalTarget && totalTarget > 0) {
-                            setLoading(false);
-                        }
-                    }
-                } catch (err) {
-                    console.error("Error en polling:", err);
-                }
-            }, 2000); // Un poco más rápido para mejor feedback
-        }
-        return () => clearInterval(interval);
-    }, [loading, totalTarget]);
-
-    // Cargar credenciales
+    // Cargar credenciales disponibles
     useEffect(() => {
         const fetchCredentials = async () => {
             if (!userId) return;
@@ -62,8 +36,43 @@ const Consumer = () => {
         fetchCredentials();
     }, [userId]);
 
+    // SSE: progreso en tiempo real
+    useEffect(() => {
+        if (taskId && loading) {
+            const eventSource = new EventSource(`${API_BASE_URL}/api/vulns/progress/${taskId}`);
+            eventSourceRef.current = eventSource;
+
+            eventSource.addEventListener('progress', (e) => {
+                const data = JSON.parse(e.data);
+                setProgressCount(data.processed);
+                setTotalTarget(data.total);
+            });
+
+            eventSource.addEventListener('complete', () => {
+                setLoading(false);
+                setTaskId(null);
+                eventSource.close();
+                setNotification({ message: 'Sincronización completada', type: 'success' });
+                setTimeout(() => setNotification({ message: '', type: '' }), 5000);
+            });
+
+            eventSource.addEventListener('error', (err) => {
+                console.error('SSE error:', err);
+                setLoading(false);
+                setTaskId(null);
+                eventSource.close();
+                setNotification({ message: 'Error en la sincronización', type: 'error' });
+                setTimeout(() => setNotification({ message: '', type: '' }), 5000);
+            });
+
+            return () => {
+                eventSource.close();
+            };
+        }
+    }, [taskId, loading]);
+
     const addServer = () => {
-        setServers((prev) => [...prev, { id: nextServerId, ip: '', port: '', credentialId: '' }]);
+        setServers((prev) => [...prev, { id: nextServerId, ip: '', credentialId: '' }]);
         setNextServerId((id) => id + 1);
     };
 
@@ -82,15 +91,16 @@ const Consumer = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setProgressCount(0); // Reiniciamos contador visual
+        setProgressCount(0);
+        setTotalTarget(0);
+        setNotification({ message: '', type: '' });
         
-        let totalCule = 0;
         const appAuth = localStorage.getItem('auth_basic');
         
         try {
             for (const server of servers) {
-                // 1. Obtener el total dinámico
-                const countRes = await fetch(`${API_BASE_URL}/api/vulns/remote-count`, {
+                // 1. Obtener el total de vulnerabilidades NUEVAS (no el global)
+                const countRes = await fetch(`${API_BASE_URL}/api/vulns/remote-new-count`, {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -101,26 +111,41 @@ const Consumer = () => {
                         infrastructureCredentialId: parseInt(server.credentialId)
                     })
                 });
-                const data = await countRes.json();
-                totalCule += (data.total || 0);
-                setTotalTarget(totalCule);
+                const countData = await countRes.json();
+                const newCount = countData.newCount || 0;
+                setTotalTarget(prev => prev + newCount);
 
-                // 2. Disparar consumo
-                fetch(`${API_BASE_URL}/api/vulns/consume`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': appAuth 
-                    },
-                    body: JSON.stringify({
-                        ip: server.ip,
-                        infrastructureCredentialId: parseInt(server.credentialId)
-                    })
-                });
+                // 2. Llamar al consumo (solo si hay novedades)
+                if (newCount > 0) {
+                    const consumeRes = await fetch(`${API_BASE_URL}/api/vulns/consume`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': appAuth 
+                        },
+                        body: JSON.stringify({
+                            ip: server.ip,
+                            infrastructureCredentialId: parseInt(server.credentialId)
+                        })
+                    });
+                    const consumeData = await consumeRes.json();
+                    if (consumeData.taskId) {
+                        setTaskId(consumeData.taskId);
+                    } else if (consumeData.alreadySynced) {
+                        setNotification({ message: consumeData.message, type: 'info' });
+                        setLoading(false);
+                        return;
+                    }
+                } else {
+                    setNotification({ message: 'No hay nuevas vulnerabilidades', type: 'info' });
+                    setLoading(false);
+                    return;
+                }
             }
         } catch (error) {
-            console.error("Error iniciando consumo:", error);
+            console.error("Error:", error);
             setLoading(false);
+            setNotification({ message: 'Error al iniciar la sincronización', type: 'error' });
         }
     };
 
@@ -128,24 +153,29 @@ const Consumer = () => {
         <div className="consumer-container">
             <main className="consumer-content-wrapper">
                 <header className="consumer-header">
-                    <button 
-                        className="back-button" 
-                        onClick={() => navigate(-1)} 
-                        disabled={loading} // No dejar volver mientras procesa
-                    >
+                    <button className="back-button" onClick={() => navigate(-1)} disabled={loading}>
                         <ArrowLeft size={24} />
                     </button>
                     <h1 className="welcome-text">Configuración Wazuh</h1>
                 </header>
 
                 <section className="consumer-card">
+                    {notification.message && (
+                        <div className={`notification ${notification.type}`}>
+                            {notification.type === 'success' && <CheckCircle size={20} />}
+                            {notification.type === 'error' && <AlertCircle size={20} />}
+                            {notification.type === 'info' && <Database size={20} />}
+                            <span>{notification.message}</span>
+                        </div>
+                    )}
+
                     <div className="db-icon-container">
                         <div className={`icon-wrapper ${loading ? 'spinning-slow' : ''}`}>
                             <Database size={60} />
                         </div>
                         <p className="main-subtitle">
                             {loading 
-                                ? "Sincronizando vulnerabilidades con la base de datos local..." 
+                                ? "Sincronizando vulnerabilidades nuevas..." 
                                 : "Asocia tus servidores con los perfiles de credenciales registrados"}
                         </p>
                     </div>
@@ -165,19 +195,6 @@ const Consumer = () => {
                                             required
                                         />
                                     </div>
-                                    {/* 
-                                    <div className="input-group">
-                                        <label>Puerto</label>
-                                        <input
-                                            type="number"
-                                            disabled={loading}
-                                            placeholder="55000"
-                                            value={server.port}
-                                            onChange={(e) => handleInputChange(server.id, 'port', e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    */}
                                     <div className="input-group">
                                         <label>Perfil de Credencial</label>
                                         <select
@@ -193,14 +210,9 @@ const Consumer = () => {
                                             ))}
                                         </select>
                                     </div>
-
                                     <div className="actions-group">
                                         {servers.length > 1 && !loading && (
-                                            <button 
-                                                type="button" 
-                                                className="remove-btn" 
-                                                onClick={() => removeServer(server.id)}
-                                            >
+                                            <button type="button" className="remove-btn" onClick={() => removeServer(server.id)}>
                                                 <Trash2 size={20} />
                                             </button>
                                         )}
@@ -216,18 +228,11 @@ const Consumer = () => {
                             </button>
                         )}
 
-                        {/* BOTÓN DINÁMICO */}
-                        <button 
-                            type="submit" 
-                            className={`submit-btn ${loading ? 'loading-active' : ''}`} 
-                            disabled={loading}
-                        >
+                        <button type="submit" className={`submit-btn ${loading ? 'loading-active' : ''}`} disabled={loading}>
                             {loading ? (
                                 <>
                                     <Loader2 className="spinner" size={20} />
-                                    <span>
-                                        Sincronizando: {progressCount} / {totalTarget}
-                                    </span>
+                                    <span>Sincronizando: {progressCount} / {totalTarget}</span>
                                 </>
                             ) : (
                                 <>
