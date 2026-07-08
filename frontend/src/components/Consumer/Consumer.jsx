@@ -95,6 +95,14 @@ const Consumer = () => {
         setNotification({ message: '', type: '' });
         
         const appAuth = localStorage.getItem('auth_basic');
+
+        const readJsonResponse = async (response) => {
+            try {
+                return await response.json();
+            } catch {
+                return null;
+            }
+        };
         
         try {
             for (const server of servers) {
@@ -110,7 +118,12 @@ const Consumer = () => {
                         infrastructureCredentialId: parseInt(server.credentialId)
                     })
                 });
-                const countData = await countRes.json();
+
+                const countData = await readJsonResponse(countRes);
+                if (!countRes.ok) {
+                    throw new Error(countData?.message || 'No se pudo obtener el conteo remoto de vulnerabilidades');
+                }
+
                 const newCount = countData.newCount || 0;
                 setTotalTarget(prev => prev + newCount);
 
@@ -127,7 +140,12 @@ const Consumer = () => {
                             infrastructureCredentialId: parseInt(server.credentialId)
                         })
                     });
-                    const consumeData = await consumeRes.json();
+
+                    const consumeData = await readJsonResponse(consumeRes);
+                    if (!consumeRes.ok) {
+                        throw new Error(consumeData?.message || 'No se pudo iniciar la sincronización');
+                    }
+
                     if (consumeData.taskId) {
                         setTaskId(consumeData.taskId);
                     } else if (consumeData.alreadySynced) {
