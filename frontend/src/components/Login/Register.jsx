@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { buildApiUrl } from '../../config/api';
 import './Login.css'; // Reutilizamos los estilos
-
-const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const Register = () => {
     const navigate = useNavigate();
@@ -32,7 +31,7 @@ const Register = () => {
         const fullEmail = `${formData.userPrefix}@usach.cl`;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users`, {
+            const response = await fetch(buildApiUrl('/api/users'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

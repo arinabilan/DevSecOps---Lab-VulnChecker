@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom'; 
+import { buildApiUrl } from '../../config/api';
 import './Login.css';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const Login = () => {
     const [userPrefix, setUserPrefix] = useState('');
@@ -16,7 +15,7 @@ const Login = () => {
         const fullEmail = `${userPrefix}@usach.cl`;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/login`, {
+            const response = await fetch(buildApiUrl('/api/users/login'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

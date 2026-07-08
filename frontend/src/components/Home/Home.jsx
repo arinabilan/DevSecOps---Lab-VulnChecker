@@ -10,7 +10,7 @@ import {
     Download // Nuevo icono para el botón de Wazuh
 } from 'lucide-react';
 import './Home.css';
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 const Home = () => {
     const [userName] = useState(() => localStorage.getItem('user_name') || 'Usuario');
     const userRole = localStorage.getItem('user_role'); // Obtenemos el rol

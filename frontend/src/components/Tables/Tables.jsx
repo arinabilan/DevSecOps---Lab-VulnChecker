@@ -2,9 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, RefreshCcw, Search } from 'lucide-react';
 import { buildApiUrl } from '../../config/api';
 import './Tables.css';
-const API_BASE_URL = import.meta.env.VITE_API_URL;
-const API_URL = `${API_BASE_URL}/api/vulnerabilities`;
-const FILTERS_URL = `${API_BASE_URL}/api/vulnerabilities/filters`;
+const API_URL = buildApiUrl('/api/vulnerabilities');
+const FILTERS_URL = buildApiUrl('/api/vulnerabilities/filters');
 const PAGE_SIZE = 12;
 
 const formatDate = (dateValue) => {

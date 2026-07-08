@@ -138,7 +138,7 @@ public class SshTunnelManager {
             }
         }
         log.warn("No se encontró el puerto local para la sesión, usando fallback 9201");
-        return 9201; // fallback
+        return WAZUH_API_PORT; // fallback
     }
 
     /**

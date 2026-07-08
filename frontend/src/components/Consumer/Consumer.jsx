@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Database, Plus, Trash2, ArrowLeft, Send, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { buildApiUrl } from '../../config/api';
 import './Consumer.css';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const Consumer = () => {
     const navigate = useNavigate();
@@ -24,7 +23,7 @@ const Consumer = () => {
         const fetchCredentials = async () => {
             if (!userId) return;
             try {
-                const response = await fetch(`${API_BASE_URL}/api/infra-credentials/user/${userId}`);
+                const response = await fetch(buildApiUrl(`/api/infra-credentials/user/${userId}`));
                 if (response.ok) {
                     const data = await response.json();
                     setAvailableCredentials(data);
@@ -39,7 +38,7 @@ const Consumer = () => {
     // SSE: progreso en tiempo real
     useEffect(() => {
         if (taskId && loading) {
-            const eventSource = new EventSource(`${API_BASE_URL}/api/vulns/progress/${taskId}`);
+            const eventSource = new EventSource(buildApiUrl(`/api/vulns/progress/${taskId}`));
             eventSourceRef.current = eventSource;
 
             eventSource.addEventListener('progress', (e) => {
@@ -100,7 +99,7 @@ const Consumer = () => {
         try {
             for (const server of servers) {
                 // 1. Obtener el total de vulnerabilidades NUEVAS (no el global)
-                const countRes = await fetch(`${API_BASE_URL}/api/vulns/remote-new-count`, {
+                const countRes = await fetch(buildApiUrl('/api/vulns/remote-new-count'), {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -117,7 +116,7 @@ const Consumer = () => {
 
                 // 2. Llamar al consumo (solo si hay novedades)
                 if (newCount > 0) {
-                    const consumeRes = await fetch(`${API_BASE_URL}/api/vulns/consume`, {
+                    const consumeRes = await fetch(buildApiUrl('/api/vulns/consume'), {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',

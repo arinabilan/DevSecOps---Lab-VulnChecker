@@ -2,10 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, RefreshCcw, Search } from 'lucide-react';
 import { buildApiUrl } from '../../config/api';
 import './Evolution.css';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL;
-const FILTERS_URL = `${API_BASE_URL}/api/snapshots/evolution/filters`;
-const EVOLUTION_URL = `${API_BASE_URL}/api/snapshots/evolution`;
+const FILTERS_URL = buildApiUrl('/api/snapshots/evolution/filters');
+const EVOLUTION_URL = buildApiUrl('/api/snapshots/evolution');
 const PAGE_SIZE = 10;
 
 const metricLabels = {

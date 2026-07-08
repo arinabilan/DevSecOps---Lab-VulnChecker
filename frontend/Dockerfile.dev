@@ -6,4 +6,4 @@ RUN npm install
 COPY . .
 RUN test -f package.json || (echo "Build context error: package.json missing after COPY" && exit 1)
 EXPOSE 5173
-CMD ["sh", "./docker-entrypoint.sh"]
+CMD ["sh", "-lc", "npm install && npm run dev -- --host"]

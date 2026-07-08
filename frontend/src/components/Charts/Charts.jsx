@@ -7,6 +7,7 @@ import {
     ResponsiveContainer,
     Tooltip,
 } from 'recharts';
+import { buildApiUrl } from '../../config/api';
 import './Charts.css';
 
 const CHART_COLORS = [
@@ -150,7 +151,6 @@ const PieCard = ({ title, data, wide = false }) => {
         </article>
     );
 };
-const API_BASE_URL = import.meta.env.VITE_API_URL;
 const Charts = () => {
     const [stats, setStats] = useState(EMPTY_STATS);
     const [loading, setLoading] = useState(true);
@@ -161,7 +161,7 @@ const Charts = () => {
         setError('');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/vulnerabilities/charts`);
+            const response = await fetch(buildApiUrl('/api/vulnerabilities/charts'));
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }

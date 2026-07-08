@@ -6,8 +6,6 @@ import {
 import { buildApiUrl } from '../../config/api';
 import './Settings.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
-
 const Settings = () => {
     // Estados Infraestructura
     const [infraName, setInfraName] = useState('');
@@ -33,12 +31,12 @@ const Settings = () => {
 
         try {
             // 1. Cargar credenciales de infraestructura
-            const resInfra = await fetch(`${API_BASE_URL}/api/infra-credentials/user/${userId}`);
+            const resInfra = await fetch(buildApiUrl(`/api/infra-credentials/user/${userId}`));
             if (resInfra.ok) setInfraCredentials(await resInfra.json());
 
             // 2. Si es ADMIN, cargar usuarios pendientes (active = false)
             if (userRole === 'ADMIN') {
-                const resUsers = await fetch(`${API_BASE_URL}/api/users/pending`);
+                const resUsers = await fetch(buildApiUrl('/api/users/pending'));
                 if (resUsers.ok) setPendingUsers(await resUsers.json());
             }
         } catch (error) { 
@@ -52,7 +50,7 @@ const Settings = () => {
     const handleActivateUser = async (id) => {
         if (!window.confirm("¿Confirmas la activación de este usuario?")) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/users/${id}/activate`, { method: 'PATCH' });
+            const res = await fetch(buildApiUrl(`/api/users/${id}/activate`), { method: 'PATCH' });
             if (res.ok) fetchData();
         } catch (error) { console.error('Error:', error); }
     };
@@ -60,7 +58,7 @@ const Settings = () => {
     const handleDeleteUser = async (id) => {
         if (!window.confirm("¿Estás seguro de rechazar/eliminar esta solicitud?")) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/users/${id}`, { method: 'DELETE' });
+            const res = await fetch(buildApiUrl(`/api/users/${id}`), { method: 'DELETE' });
             if (res.ok) fetchData();
         } catch (error) { console.error('Error:', error); }
     };
@@ -108,8 +106,8 @@ const Settings = () => {
 
         try {
             const url = editingId 
-                ? `${API_BASE_URL}/api/infra-credentials/${editingId}`
-                : `${API_BASE_URL}/api/infra-credentials`;
+                ? buildApiUrl(`/api/infra-credentials/${editingId}`)
+                : buildApiUrl('/api/infra-credentials');
             const appAuth = localStorage.getItem('auth_basic');
             const response = await fetch(url, {
                 method: editingId ? 'PUT' : 'POST',
