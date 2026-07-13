@@ -26,6 +26,12 @@ jobs:
         # Ejecutamos el empaquetado saltando tests para verificar que el código es válido
         # Añadimos -f para indicarle el archivo pom exacto
         run: mvn -f vulncheckerbackend/pom.xml clean package -DskipTests -B
+
+      - name: Subir clases compiladas para SonarQube
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-classes
+          path: vulncheckerbackend/target/classes
         
   # ETAPA 2: Análisis de Calidad con Sonar
   sonarqube:
@@ -37,6 +43,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Descargar clases compiladas
+        uses: actions/download-artifact@v4
+        with:
+          name: java-classes
+          path: vulncheckerbackend/target/classes
 
       # ---> AGREGAMOS ESTE PASO AQUÍ PARA EVITAR EL ERROR HTTP 403 <---
       - name: Configurar JDK 21 para Sonar
