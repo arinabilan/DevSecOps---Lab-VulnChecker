@@ -15,6 +15,7 @@ public class VulncheckerbackendApplication {
         SpringApplication.run(VulncheckerbackendApplication.class, args);
     }
 
+    @SuppressWarnings("java:S2068") // fallback solo para desarrollo local; en producción definir ADMIN_PASSWORD
     @Bean
     CommandLineRunner initData(UserRepository userRepository, BCryptPasswordEncoder encoder) {
         return args -> {
