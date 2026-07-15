@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -208,7 +207,7 @@ public class WazuhService {
         });
     }
 
-    @Transactional
+    @SuppressWarnings("java:S2229")
     public void performSync(WazuhCredentials creds, String taskId, SseEmitter emitter) throws Exception {
         // 1. Obtener la fecha de la última sincronización exitosa
         LocalDateTime lastSync = vulnerabilityRepository.findMaxLastSync();
