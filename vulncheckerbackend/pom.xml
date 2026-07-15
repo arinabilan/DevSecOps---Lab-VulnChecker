@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>17</java.version>
 		<jacoco.version>0.8.15</jacoco.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -129,10 +130,12 @@
 						<goals>
 							<goal>prepare-agent</goal>
 						</goals>
+						<configuration>
+							<propertyName>argLine</propertyName>
+						</configuration>
 					</execution>
 					<execution>
 						<id>report</id>
-						<phase>test</phase>
 						<goals>
 							<goal>report</goal>
 						</goals>
