@@ -32,11 +32,7 @@ const Login = () => {
                 localStorage.setItem('is_authenticated', 'true');
                 localStorage.setItem('user_name', user.firstName); // Para saludarlo en el Home
                 
-                if (user.role === 'ADMIN') {
-                    navigate('/home');
-                } else {
-                    navigate('/home');
-                }
+                navigate('/home');
             } else if (response.status === 401) {
                 alert('Credenciales incorrectas o cuenta aún no aprobada por el administrador.');
             } else {

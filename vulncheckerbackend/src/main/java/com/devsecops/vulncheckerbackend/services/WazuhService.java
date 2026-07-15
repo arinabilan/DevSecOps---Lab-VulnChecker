@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -396,7 +397,7 @@ public class WazuhService {
                 agent.setOsType(osType);
                 agent.setOsFullName(osFullName);
                 agent.setOsPlataform(osPlatform);
-                agent.setLastSeen(LocalDateTime.now());
+                agent.setLastSeen(LocalDateTime.now(ZoneOffset.UTC));
                 agent = agentRepository.save(agent);
                 Long agentIdNum = agent.getId();
 
@@ -439,7 +440,7 @@ public class WazuhService {
                     entity.setCvss3Score(cvssScore);
                     entity.setDetectionTime(detectedAt);
                     entity.setLastDetection(detectedAt);
-                    entity.setLastSync(LocalDateTime.now());
+                    entity.setLastSync(LocalDateTime.now(ZoneOffset.UTC));
                     toSave.add(entity);
                 }
             } catch (Exception e) {
@@ -473,8 +474,8 @@ public class WazuhService {
         existing.setPackageVersion(pkgVersion);
         existing.setPackageType(pkgType);
         existing.setDescription(pkgDescription);
-        existing.setLastDetection(LocalDateTime.now());
-        existing.setLastSync(LocalDateTime.now());
+        existing.setLastDetection(LocalDateTime.now(ZoneOffset.UTC));
+        existing.setLastSync(LocalDateTime.now(ZoneOffset.UTC));
     }
 
     private String buildKey(String cve, Long agentId, String packageName) {

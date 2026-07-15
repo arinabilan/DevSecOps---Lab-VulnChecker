@@ -280,8 +280,8 @@ const Summary = ({
                                     onChange={(e) => setPageInput(e.target.value)}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
-                                            const n = parseInt(pageInput, 10);
-                                            if (!isNaN(n)) setCurrentPage(Math.max(1, Math.min(n, totalPages)));
+                                            const n = Number.parseInt(pageInput, 10);
+                                            if (!Number.isNaN(n)) setCurrentPage(Math.max(1, Math.min(n, totalPages)));
                                             setPageInput('');
                                         }
                                     }}
@@ -289,7 +289,7 @@ const Summary = ({
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        const n = parseInt(pageInput, 10);
+                                        const n = Number.parseInt(pageInput, 10);
                                         if (!Number.isNaN(n)) setCurrentPage(Math.max(1, Math.min(n, totalPages)));
                                         setPageInput('');
                                     }}

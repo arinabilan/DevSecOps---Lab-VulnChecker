@@ -108,7 +108,7 @@ const Consumer = () => {
                     },
                     body: JSON.stringify({
                         ip: server.ip,
-                        infrastructureCredentialId: parseInt(server.credentialId)
+                        infrastructureCredentialId: Number.parseInt(server.credentialId)
                     })
                 });
                 const countData = await countRes.json();
@@ -125,7 +125,7 @@ const Consumer = () => {
                         },
                         body: JSON.stringify({
                             ip: server.ip,
-                            infrastructureCredentialId: parseInt(server.credentialId)
+                            infrastructureCredentialId: Number.parseInt(server.credentialId)
                         })
                     });
                     const consumeData = await consumeRes.json();
@@ -185,8 +185,9 @@ const Consumer = () => {
                             {servers.map((server) => (
                                 <div key={server.id} className={`server-row ${loading ? 'row-disabled' : ''}`}>
                                     <div className="input-group">
-                                        <label>Dirección IP</label>
+                                        <label htmlFor={`ip-${server.id}`}>Dirección IP</label>
                                         <input
+                                            id={`ip-${server.id}`}
                                             type="text"
                                             disabled={loading}
                                             placeholder="192.168.1.XX"
@@ -196,8 +197,9 @@ const Consumer = () => {
                                         />
                                     </div>
                                     <div className="input-group">
-                                        <label>Perfil de Credencial</label>
+                                        <label htmlFor={`cred-${server.id}`}>Perfil de Credencial</label>
                                         <select
+                                            id={`cred-${server.id}`}
                                             className="cred-select"
                                             disabled={loading}
                                             value={server.credentialId}

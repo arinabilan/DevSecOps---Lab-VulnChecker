@@ -25,7 +25,7 @@ const Navbar = () => {
 
     return (
         <nav className="global-navbar">
-            <div className="nav-left" onClick={() => navigate('/home')}>
+            <div className="nav-left" onClick={() => navigate('/home')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/home'); }}>
                 <span className="nav-logo-text">VulnChecker</span>
                 <span className="nav-separator">|</span>
                 <span className="nav-page-title">{titles[location.pathname] || 'Gestión'}</span>
