@@ -43,6 +43,10 @@ jobs:
         run: npm run test:coverage
         working-directory: frontend
 
+      # --- Obtener ruta del repositorio Maven ---
+      - name: Obtener ruta del repositorio Maven
+        run: echo "MAVEN_REPO=$HOME/.m2/repository" >> $GITHUB_ENV
+
       # --- Verificar reportes de cobertura antes del scan ---
       - name: Verificar reportes de cobertura
         run: |
@@ -64,7 +68,7 @@ jobs:
             -Dsonar.projectName=VulnChecker
             -Dsonar.sources=vulncheckerbackend,frontend
             -Dsonar.java.binaries=vulncheckerbackend/target/classes
-            -Dsonar.java.libraries=~/.m2/repository/**/*.jar
+            -Dsonar.java.libraries=${{ env.MAVEN_REPO }}/**/*.jar
             -Dsonar.sourceEncoding=UTF-8
             -Dsonar.coverage.jacoco.xmlReportPaths=vulncheckerbackend/target/site/jacoco/jacoco.xml
             -Dsonar.coverage.exclusions=**/config/**,**/dto/**,**/entities/**,**/repositories/**,**/VulncheckerbackendApplication.java
