@@ -1,5 +1,6 @@
 package com.devsecops.vulncheckerbackend.controllers;
 
+import com.devsecops.vulncheckerbackend.dto.CredentialRequest;
 import com.devsecops.vulncheckerbackend.entities.CredentialEntity;
 import com.devsecops.vulncheckerbackend.services.CredentialService;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,11 @@ public class CredentialController {
     }
 
     @PostMapping
-    public ResponseEntity<CredentialEntity> create(@RequestBody CredentialEntity credential) {
+    public ResponseEntity<CredentialEntity> create(@RequestBody CredentialRequest request) {
+        CredentialEntity credential = new CredentialEntity();
+        credential.setCreatedByUserId(request.getCreatedByUserId());
+        credential.setUsernameCredentials(request.getUsernameCredentials());
+        credential.setPasswordCredentials(request.getPasswordCredentials());
         return ResponseEntity.ok(credentialService.save(credential));
     }
 
