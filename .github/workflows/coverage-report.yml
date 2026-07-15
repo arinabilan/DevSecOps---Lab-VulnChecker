@@ -11,69 +11,48 @@ jobs:
     name: Tests + Coverage Report
     runs-on: ubuntu-latest
     steps:
-      - name: Descargar el código
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configurar JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      # --- Backend tests + JaCoCo ---
-      - name: Ejecutar tests backend con JaCoCo
-        run: mvn -f vulncheckerbackend/pom.xml test -B
+      - name: Backend tests + JaCoCo + copiar dependencias
+        run: |
+          mvn -f vulncheckerbackend/pom.xml test -B
+          mvn -f vulncheckerbackend/pom.xml dependency:copy-dependencies -DoutputDirectory=target/dependency -B -q
 
-      # --- Frontend tests + LCOV ---
       - name: Instalar dependencias frontend
         run: npm ci
         working-directory: frontend
 
-      - name: Ejecutar tests frontend con cobertura
+      - name: Frontend tests + cobertura (lcov)
         run: npm run test:coverage
         working-directory: frontend
 
-      # --- Obtener ruta del repositorio Maven ---
-      - name: Obtener ruta del repositorio Maven
-        run: echo "MAVEN_REPO=$HOME/.m2/repository" >> $GITHUB_ENV
-
-      # --- Verificar reportes de cobertura antes del scan ---
       - name: Verificar reportes de cobertura
         run: |
-          echo "=== JaCoCo report ==="
-          ls -la vulncheckerbackend/target/site/jacoco/jacoco.xml 2>&1 || echo "MISSING"
-          echo "=== LCOV report (primeras 10 lineas) ==="
-          head -10 frontend/coverage/lcov.info 2>&1 || echo "MISSING"
+          echo "=== JaCoCo XML ==="
+          wc -l vulncheckerbackend/target/site/jacoco/jacoco.xml 2>&1 || echo "MISSING"
+          echo "=== LCOV ==="
+          wc -l frontend/coverage/lcov.info 2>&1 || echo "MISSING"
           echo "=== LCOV source paths ==="
-          grep "^SF:" frontend/coverage/lcov.info | head -5 2>&1
+          grep "^SF:" frontend/coverage/lcov.info 2>&1 | head -5 || echo "MISSING"
 
-      # --- SonarCloud scan (ya con reportes de cobertura generados) ---
-      - name: Escaneo de SonarCloud
+      - name: Escaneo SonarCloud
         uses: SonarSource/sonarqube-scan-action@v6
         with:
           projectBaseDir: .
-          args: >
-            -Dsonar.organization=arinabilan
-            -Dsonar.projectKey=arinabilan_DevSecOps---Lab-VulnChecker
-            -Dsonar.projectName=VulnChecker
-            -Dsonar.sources=vulncheckerbackend,frontend
-            -Dsonar.java.binaries=vulncheckerbackend/target/classes
-            -Dsonar.java.libraries=${{ env.MAVEN_REPO }}/**/*.jar
-            -Dsonar.sourceEncoding=UTF-8
-            -Dsonar.coverage.jacoco.xmlReportPaths=vulncheckerbackend/target/site/jacoco/jacoco.xml
-            -Dsonar.coverage.exclusions=**/config/**,**/dto/**,**/entities/**,**/repositories/**,**/VulncheckerbackendApplication.java
-            -Dsonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
-            -Dsonar.exclusions=**/node_modules/**,**/target/**
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

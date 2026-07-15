@@ -17,6 +17,11 @@ export default defineConfig(({ mode }) => {
       env: {
         VITE_API_URL: 'http://test.example.com',
       },
+      coverage: {
+        provider: 'v8',
+        reporter: ['lcov', 'text'],
+        reportsDirectory: './coverage',
+      },
     },
     server: {
       host: true, // Esto permite que el puerto sea accesible desde fuera del contenedor
