@@ -35,7 +35,7 @@ jobs:
         
   # ETAPA 2: Análisis de Calidad con Sonar
   sonarqube:
-    name: Análisis de Código
+    name: Análisis de Código + Cobertura
     needs: check-compilacion
     runs-on: ubuntu-latest
     steps:
@@ -56,6 +56,27 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Backend tests + JaCoCo
+        run: mvn -f vulncheckerbackend/pom.xml test jacoco:report -B
+
+      - name: Copiar dependencias Maven para sonar.java.libraries
+        run: mvn -f vulncheckerbackend/pom.xml dependency:copy-dependencies -DoutputDirectory=target/dependency -B -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias frontend
+        run: npm ci
+        working-directory: frontend
+
+      - name: Frontend tests + cobertura (lcov)
+        run: npm run test:coverage
+        working-directory: frontend
 
       - name: Escaneo de SonarQube
         uses: SonarSource/sonarqube-scan-action@v6
