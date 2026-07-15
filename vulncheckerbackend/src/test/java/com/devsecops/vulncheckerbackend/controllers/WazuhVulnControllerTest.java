@@ -172,4 +172,72 @@ class WazuhVulnControllerTest {
                 .andExpect(jsonPath("$.taskId").exists())
                 .andExpect(jsonPath("$.status").value("processing"));
     }
+
+    @Test
+    void getCritical_happyPath_returnsData() throws Exception {
+        when(wazuhService.getCriticalVulnerabilities(any(WazuhCredentials.class)))
+                .thenReturn(Map.of("critical", 5));
+
+        mockMvc.perform(get("/api/vulns/host/user/password/critical")
+                        .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.critical").value(5));
+    }
+
+    @Test
+    void getSummary_happyPath_returnsData() throws Exception {
+        when(wazuhService.getVulnerabilitiesSummary(any(WazuhCredentials.class)))
+                .thenReturn(Map.of("total", 100));
+
+        mockMvc.perform(get("/api/vulns/host/user/password/summary")
+                        .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(100));
+    }
+
+    @Test
+    void getBySeverity_returnsData() throws Exception {
+        when(wazuhService.getVulnerabilitiesBySeverity(any(WazuhCredentials.class), eq("high"), eq(100)))
+                .thenReturn(Map.of("severity", "high"));
+
+        mockMvc.perform(get("/api/vulns/host/user/password/severity/high")
+                        .param("limit", "100")
+                        .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.severity").value("high"));
+    }
+
+    @Test
+    void getByCve_returnsData() throws Exception {
+        when(wazuhService.getVulnerabilitiesByCve(any(WazuhCredentials.class), eq("CVE-2026-0001")))
+                .thenReturn(Map.of("cve", "CVE-2026-0001"));
+
+        mockMvc.perform(get("/api/vulns/host/user/password/cve/CVE-2026-0001")
+                        .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cve").value("CVE-2026-0001"));
+    }
+
+    @Test
+    void getByAgent_returnsData() throws Exception {
+        when(wazuhService.getVulnerabilitiesByAgent(any(WazuhCredentials.class), eq("001"), eq(100)))
+                .thenReturn(Map.of("agent", "001"));
+
+        mockMvc.perform(get("/api/vulns/host/user/password/agent/001")
+                        .param("limit", "100")
+                        .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.agent").value("001"));
+    }
+
+    @Test
+    void handleError_returnsDefaultMessageForUnknownError() throws Exception {
+        when(wazuhService.getVulnerabilitiesSummary(any(WazuhCredentials.class)))
+                .thenThrow(new RuntimeException("Unknown error type"));
+
+        mockMvc.perform(get("/api/vulns/host/user/password/summary")
+                        .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Unknown error type"));
+    }
 }
