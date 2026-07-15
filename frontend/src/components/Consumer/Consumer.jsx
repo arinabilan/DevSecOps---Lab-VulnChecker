@@ -8,6 +8,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 const Consumer = () => {
     const navigate = useNavigate();
     const userId = localStorage.getItem('user_id');
+    const parsedUserId = Number.parseInt(userId, 10);
     
     const [servers, setServers] = useState([{ id: 1, ip: '', credentialId: '' }]);
     const [availableCredentials, setAvailableCredentials] = useState([]);
@@ -24,7 +25,7 @@ const Consumer = () => {
         const fetchCredentials = async () => {
             if (!userId) return;
             try {
-                const response = await fetch(`${API_BASE_URL}/api/infra-credentials/user/${userId}`);
+                const response = await fetch(`${API_BASE_URL}/api/infra-credentials/user/${parsedUserId}`);
                 if (response.ok) {
                     const data = await response.json();
                     setAvailableCredentials(data);

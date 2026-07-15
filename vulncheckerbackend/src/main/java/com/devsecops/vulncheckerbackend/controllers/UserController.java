@@ -1,5 +1,7 @@
 package com.devsecops.vulncheckerbackend.controllers;
 
+import com.devsecops.vulncheckerbackend.dto.LoginRequest;
+import com.devsecops.vulncheckerbackend.dto.UserRequest;
 import com.devsecops.vulncheckerbackend.entities.UserEntity;
 import com.devsecops.vulncheckerbackend.repositories.UserRepository;
 import com.devsecops.vulncheckerbackend.services.UserService;
@@ -21,7 +23,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody UserEntity loginRequest) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         return userService.login(loginRequest.getEmail(), loginRequest.getPassword())
                 .map(user -> ResponseEntity.ok(user))
                 .orElse(ResponseEntity.status(401).build());
@@ -33,7 +35,13 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<UserEntity> createUser(@RequestBody UserEntity user) {
+    public ResponseEntity<UserEntity> createUser(@RequestBody UserRequest request) {
+        UserEntity user = new UserEntity();
+        user.setFirstName(request.getFirstName());
+        user.setPaternalLastName(request.getPaternalLastName());
+        user.setMaternalLastName(request.getMaternalLastName());
+        user.setEmail(request.getEmail());
+        user.setPassword(request.getPassword());
         user.setActive(false);
         user.setRole("USER");
         UserEntity savedUser = userService.save(user);
