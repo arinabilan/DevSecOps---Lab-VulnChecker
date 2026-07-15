@@ -43,6 +43,16 @@ jobs:
         run: npm run test:coverage
         working-directory: frontend
 
+      # --- Verificar reportes de cobertura antes del scan ---
+      - name: Verificar reportes de cobertura
+        run: |
+          echo "=== JaCoCo report ==="
+          ls -la vulncheckerbackend/target/site/jacoco/jacoco.xml 2>&1 || echo "MISSING"
+          echo "=== LCOV report (primeras 10 lineas) ==="
+          head -10 frontend/coverage/lcov.info 2>&1 || echo "MISSING"
+          echo "=== LCOV source paths ==="
+          grep "^SF:" frontend/coverage/lcov.info | head -5 2>&1
+
       # --- SonarCloud scan (ya con reportes de cobertura generados) ---
       - name: Escaneo de SonarCloud
         uses: SonarSource/sonarqube-scan-action@v6
@@ -54,6 +64,8 @@ jobs:
             -Dsonar.projectName=VulnChecker
             -Dsonar.sources=vulncheckerbackend,frontend
             -Dsonar.java.binaries=vulncheckerbackend/target/classes
+            -Dsonar.java.libraries=~/.m2/repository/**/*.jar
+            -Dsonar.sourceEncoding=UTF-8
             -Dsonar.coverage.jacoco.xmlReportPaths=vulncheckerbackend/target/site/jacoco/jacoco.xml
             -Dsonar.coverage.exclusions=**/config/**,**/dto/**,**/entities/**,**/repositories/**,**/VulncheckerbackendApplication.java
             -Dsonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
