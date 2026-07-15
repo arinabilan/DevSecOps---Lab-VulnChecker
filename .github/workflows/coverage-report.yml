@@ -46,6 +46,18 @@ jobs:
       # --- SonarCloud scan (ya con reportes de cobertura generados) ---
       - name: Escaneo de SonarCloud
         uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          projectBaseDir: .
+          args: >
+            -Dsonar.organization=arinabilan
+            -Dsonar.projectKey=arinabilan_DevSecOps---Lab-VulnChecker
+            -Dsonar.projectName=VulnChecker
+            -Dsonar.sources=vulncheckerbackend,frontend
+            -Dsonar.java.binaries=vulncheckerbackend/target/classes
+            -Dsonar.coverage.jacoco.xmlReportPaths=vulncheckerbackend/target/site/jacoco/jacoco.xml
+            -Dsonar.coverage.exclusions=**/config/**,**/dto/**,**/entities/**,**/repositories/**,**/VulncheckerbackendApplication.java
+            -Dsonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
+            -Dsonar.exclusions=**/node_modules/**,**/target/**
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
