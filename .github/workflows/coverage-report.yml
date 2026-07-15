@@ -43,6 +43,8 @@ jobs:
 
       - name: Verificar reportes de cobertura
         run: |
+          echo "=== jacoco.exec ==="
+          ls -lh vulncheckerbackend/target/jacoco.exec 2>&1 || echo "MISSING"
           echo "=== JaCoCo XML ==="
           wc -l vulncheckerbackend/target/site/jacoco/jacoco.xml 2>&1 || echo "MISSING"
           echo "=== Dependencias copiadas ==="
