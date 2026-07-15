@@ -28,7 +28,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Backend tests + JaCoCo
-        run: mvn -f vulncheckerbackend/pom.xml test -B
+        run: mvn -f vulncheckerbackend/pom.xml test jacoco:report -B
 
       - name: Copiar dependencias Maven para sonar.java.libraries
         run: mvn -f vulncheckerbackend/pom.xml dependency:copy-dependencies -DoutputDirectory=target/dependency -B -q
