@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import java.security.*;
 import java.util.Base64;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Service
 public class ReportSignatureService {
@@ -41,7 +42,7 @@ public class ReportSignatureService {
         reportSignatureEntity.setReportName(reportName);
         reportSignatureEntity.setSha256Hash(sha256Hash);
         reportSignatureEntity.setDigitalSignature(digitalSignatureBase64);
-        reportSignatureEntity.setSignedAt(LocalDateTime.now());
+        reportSignatureEntity.setSignedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         
         return reportSignatureRepository.save(reportSignatureEntity); 

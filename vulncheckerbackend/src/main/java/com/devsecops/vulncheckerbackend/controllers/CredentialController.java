@@ -8,7 +8,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/credentials")
-@CrossOrigin(origins = "*")
 public class CredentialController {
 
     private final CredentialService credentialService;

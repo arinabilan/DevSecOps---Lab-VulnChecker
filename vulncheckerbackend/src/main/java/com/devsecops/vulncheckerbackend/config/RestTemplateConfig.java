@@ -11,8 +11,11 @@ import java.security.cert.X509Certificate;
 /**
  * RestTemplate que acepta el certificado auto-firmado de Wazuh.
  * ⚠️ En producción reemplaza esto por un truststore con el cert real de Wazuh.
+ * La supresión de S5527/S5525 es intencional: Wazuh usa certificados auto-firmados
+ * en entorno controlado. En producción se debe configurar un truststore válido.
  */
 @Configuration
+@SuppressWarnings({"java:S5527", "java:S5525"})
 public class RestTemplateConfig {
 
     @Bean(name = "wazuhRestTemplate")

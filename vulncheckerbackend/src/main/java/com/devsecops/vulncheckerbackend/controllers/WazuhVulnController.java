@@ -52,6 +52,19 @@ public class WazuhVulnController {
         );
     }
 
+    // ======================= HELPER =======================
+    private String[] parseBasicAuth(String auth) {
+        if (auth == null || !auth.startsWith("Basic ")) {
+            throw new IllegalArgumentException("Invalid Authorization header");
+        }
+        String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "").trim()));
+        String[] parts = decoded.split(":", 2);
+        if (parts.length < 2) {
+            throw new IllegalArgumentException("Invalid credentials format in Authorization header");
+        }
+        return parts;
+    }
+
     // ======================= ENDPOINTS LEGACY (CONSULTA DIRECTA) =======================
     // Se mantienen exactamente igual que en tu versión original
     @GetMapping("/{sshHost}/{sshUser}/{sshPassword}/all")
@@ -60,8 +73,7 @@ public class WazuhVulnController {
             @PathVariable String sshUser,
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth) throws Exception {
-        String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "").trim()));
-        String[] parts = decoded.split(":", 2);
+        String[] parts = parseBasicAuth(auth);
         WazuhCredentials creds = new WazuhCredentials(sshHost, sshUser, sshPassword, parts[0], parts[1]);
         return ResponseEntity.ok(wazuhService.getAllVulnerabilities(creds, 100, 0));
     }
@@ -73,8 +85,7 @@ public class WazuhVulnController {
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth,
             @PathVariable int limit) throws Exception {
-        String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "").trim()));
-        String[] parts = decoded.split(":", 2);
+        String[] parts = parseBasicAuth(auth);
         WazuhCredentials creds = new WazuhCredentials(sshHost, sshUser, sshPassword, parts[0], parts[1]);
         return ResponseEntity.ok(wazuhService.getTopVulnerabilities(creds, limit));
     }
@@ -85,8 +96,7 @@ public class WazuhVulnController {
             @PathVariable String sshUser,
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth) throws Exception {
-        String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "").trim()));
-        String[] parts = decoded.split(":", 2);
+        String[] parts = parseBasicAuth(auth);
         WazuhCredentials creds = new WazuhCredentials(sshHost, sshUser, sshPassword, parts[0], parts[1]);
         return ResponseEntity.ok(wazuhService.getCriticalVulnerabilities(creds));
     }
@@ -99,8 +109,7 @@ public class WazuhVulnController {
             @RequestHeader("Authorization") String auth,
             @PathVariable String severity,
             @RequestParam(defaultValue = "100") int limit) throws Exception {
-        String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "").trim()));
-        String[] parts = decoded.split(":", 2);
+        String[] parts = parseBasicAuth(auth);
         WazuhCredentials creds = new WazuhCredentials(sshHost, sshUser, sshPassword, parts[0], parts[1]);
         return ResponseEntity.ok(wazuhService.getVulnerabilitiesBySeverity(creds, severity, limit));
     }
@@ -112,8 +121,7 @@ public class WazuhVulnController {
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth,
             @PathVariable String cve) throws Exception {
-        String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "").trim()));
-        String[] parts = decoded.split(":", 2);
+        String[] parts = parseBasicAuth(auth);
         WazuhCredentials creds = new WazuhCredentials(sshHost, sshUser, sshPassword, parts[0], parts[1]);
         return ResponseEntity.ok(wazuhService.getVulnerabilitiesByCve(creds, cve));
     }
@@ -126,8 +134,7 @@ public class WazuhVulnController {
             @RequestHeader("Authorization") String auth,
             @PathVariable String agentId,
             @RequestParam(defaultValue = "100") int limit) throws Exception {
-        String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "").trim()));
-        String[] parts = decoded.split(":", 2);
+        String[] parts = parseBasicAuth(auth);
         WazuhCredentials creds = new WazuhCredentials(sshHost, sshUser, sshPassword, parts[0], parts[1]);
         return ResponseEntity.ok(wazuhService.getVulnerabilitiesByAgent(creds, agentId, limit));
     }
@@ -138,8 +145,7 @@ public class WazuhVulnController {
             @PathVariable String sshUser,
             @PathVariable String sshPassword,
             @RequestHeader("Authorization") String auth) throws Exception {
-        String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "").trim()));
-        String[] parts = decoded.split(":", 2);
+        String[] parts = parseBasicAuth(auth);
         WazuhCredentials creds = new WazuhCredentials(sshHost, sshUser, sshPassword, parts[0], parts[1]);
         return ResponseEntity.ok(wazuhService.getVulnerabilitiesSummary(creds));
     }
@@ -221,7 +227,7 @@ public class WazuhVulnController {
             emitters.put(taskId, emitter);
             emitter.onCompletion(() -> emitters.remove(taskId));
             emitter.onTimeout(() -> emitters.remove(taskId));
-            log.warn("Se creó un nuevo emitter para taskId {} que posiblemente no tenga tarea asociada", taskId);
+            log.warn("Se creó un nuevo emitter para una tarea que posiblemente no tenga tarea asociada");
         }
         return emitter;
     }
