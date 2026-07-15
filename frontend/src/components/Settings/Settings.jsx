@@ -27,13 +27,14 @@ const Settings = () => {
     const [showVerifyModal, setShowVerifyModal] = useState(false);
     const [userPasswordVerify, setUserPasswordVerify] = useState('');
     const userId = localStorage.getItem('user_id');
+    const parsedUserId = Number.parseInt(userId, 10);
 
     const fetchData = useCallback(async () => {
         if (!userId) return;
 
         try {
             // 1. Cargar credenciales de infraestructura
-            const resInfra = await fetch(`${API_BASE_URL}/api/infra-credentials/user/${userId}`);
+            const resInfra = await fetch(`${API_BASE_URL}/api/infra-credentials/user/${parsedUserId}`);
             if (resInfra.ok) setInfraCredentials(await resInfra.json());
 
             // 2. Si es ADMIN, cargar usuarios pendientes (active = false)
@@ -44,7 +45,7 @@ const Settings = () => {
         } catch (error) { 
             console.error('Error al cargar datos:', error); 
         }
-    }, [userId, userRole]);
+    }, [parsedUserId, userRole]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
