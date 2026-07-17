@@ -131,7 +131,9 @@ jobs:
           # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v2-estable
           # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v3-estable
           # docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v4-estable
+          docker tag ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v5-estable
           docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:latest
+          docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v5-estable
           # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v4-estable
           # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v3-estable
           # docker push ghcr.io/${{ github.repository_owner }}/backend-vulnchecker:v2-estable
