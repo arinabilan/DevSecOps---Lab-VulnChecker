@@ -4,10 +4,11 @@
 
 | Componente | Estado | Detalle |
 |---|---|---|
-| Wazuh Manager | ✅ Running | Contabo 217.216.48.103 |
+| Wazuh Manager 1 | ✅ Running | Contabo (IP: `<IP_CONTABO_1>`) |
+| Wazuh Manager 2 | ✅ Running | Contabo (IP: `<IP_CONTABO_2>`) |
 | Wazuh Indexer | ✅ Running | 2.763 vulnerabilidades indexadas |
 | Wazuh Agent | ✅ Active | digitalocean-vulnchecker (ID: 001) |
-| Backend API | ✅ UP | DigitalOcean 157.230.177.115 (HTTPS) |
+| Backend API | ✅ UP | DigitalOcean (IP: `<IP_DIGITALOCEAN>`) (HTTPS) |
 | PostgreSQL | ✅ Running | DigitalOcean (interno, Dokploy) |
 | SSH Tunnel | ✅ Funcional | DigitalOcean → Contabo :9200 |
 | Frontend | ✅ Running | Vercel (vulnchecker-frontend.vercel.app) |
@@ -19,13 +20,13 @@
 | Servicio | URL | Notas |
 |---|---|---|
 | Frontend (Vercel) | `https://vulnchecker-frontend.vercel.app` | SPA React |
-| Backend API | `https://157.230.177.115.nip.io/api` | Spring Boot |
-| Backend Health | `https://157.230.177.115.nip.io/actuator/health` | `{"status":"UP"}` |
-| Dokploy UI | `http://157.230.177.115:3000` | Panel de despliegue |
-| Wazuh Dashboard | `https://217.216.48.103:4430` | admin / admin |
-| Wazuh Indexer API | `https://217.216.48.103:9200` | admin / admin |
-| PostgreSQL (externo) | `postgresql://admin:admin123@157.230.177.115:5432/vulncheck` | Cliente SQL externo |
-| PostgreSQL (interno) | `postgresql://admin:admin123@bilan-vulncheck-qg6jib:5432/vulncheck` | Entre contenedores Dokploy |
+| Backend API | `https://<IP_DIGITALOCEAN>.nip.io/api` | Spring Boot |
+| Backend Health | `https://<IP_DIGITALOCEAN>.nip.io/actuator/health` | `{"status":"UP"}` |
+| Dokploy UI | `http://<IP_DIGITALOCEAN>:3000` | Panel de despliegue |
+| Wazuh Dashboard | `https://<IP_CONTABO>:4430` | `<USUARIO>` / `<CONTRASEÑA>` |
+| Wazuh Indexer API | `https://<IP_CONTABO>:9200` | `<USUARIO>` / `<CONTRASEÑA>` |
+| PostgreSQL (externo) | `postgresql://<DB_USER>:<DB_PASSWORD>@<IP_DIGITALOCEAN>:5432/vulncheck` | Cliente SQL externo (DBeaver, psql, etc.) |
+| PostgreSQL (interno) | `postgresql://<DB_USER>:<DB_PASSWORD>@<DOKPLOY_INTERNAL_HOST>:5432/vulncheck` | Comunicación interna en Dokploy |
 
 ---
 
@@ -35,34 +36,34 @@
 
 | Acceso | Usuario | Contraseña |
 |---|---|---|
-| SSH | `sepul` | `Sepul1995` |
-| Wazuh Dashboard | `admin` | `admin` |
-| Wazuh Indexer API | `admin` | `admin` |
+| SSH | `<SSH_USER>` | `<SSH_PASSWORD>` |
+| Wazuh Dashboard | `<WAZUH_USER>` | `<WAZUH_PASSWORD>` |
+| Wazuh Indexer API | `<WAZUH_USER>` | `<WAZUH_PASSWORD>` |
 
 ### Máquina 2 — DigitalOcean (Backend)
 
 | Acceso | Usuario | Contraseña / Valor |
 |---|---|---|
-| SSH / root | `root` | (password del droplet) |
-| Dokploy UI | — | `http://157.230.177.115:3000` (primer acceso crea cuenta) |
-| PostgreSQL | `admin` | `admin123` |
+| SSH / root | `root` | `<DROPLET_PASSWORD>` |
+| Dokploy UI | — | `http://<IP_DIGITALOCEAN>:3000` (primer acceso crea cuenta) |
+| PostgreSQL | `<DB_USER>` | `<DB_PASSWORD>` |
 | Base de datos | `vulncheck` | — |
 
 **PostgreSQL — Conexión interna (entre contenedores Dokploy):**
 ```
-postgresql://admin:admin123@bilan-vulncheck-qg6jib:5432/vulncheck
+postgresql://<DB_USER>:<DB_PASSWORD>@<DOKPLOY_INTERNAL_HOST>:5432/vulncheck
 ```
 
 **PostgreSQL — Conexión externa (cliente SQL: DBeaver, psql, TablePlus):**
 ```
-postgresql://admin:admin123@157.230.177.115:5432/vulncheck
+postgresql://<DB_USER>:<DB_PASSWORD>@<IP_DIGITALOCEAN>:5432/vulncheck
 ```
 
 **PostgreSQL — Conexión externa JDBC (Java / Spring Boot):**
 ```
-jdbc:postgresql://157.230.177.115:5432/vulncheck
+jdbc:postgresql://<IP_DIGITALOCEAN>:5432/vulncheck
 ```
-Usuario: `admin` | Contraseña: `admin123`
+Usuario: `<DB_USER>` | Contraseña: `<DB_PASSWORD>`
 
 ### Vercel (Frontend)
 
@@ -71,16 +72,16 @@ Usuario: `admin` | Contraseña: `admin123`
 | URL producción | `https://vulnchecker-frontend.vercel.app` |
 | Repositorio | `arinabilan/DevSecOps---Lab-VulnChecker` |
 | Root Directory | `frontend` |
-| Variable de entorno | `VITE_API_URL=https://157.230.177.115.nip.io` |
+| Variable de entorno | `VITE_API_URL=https://<IP_DIGITALOCEAN>.nip.io` |
 
-### Aplicación VulnChecker (credenciales de prueba)
+### Aplicación VulnChecker (credenciales de prueba de ejemplo)
 
 | Campo | Valor |
 |---|---|
-| Usuario (email prefix) | `admin.seguridad` |
+| Usuario (email prefix) | `<USER_PREFIX>` |
 | Dominio (auto-añadido) | `@usach.cl` |
-| Email completo | `admin.seguridad@usach.cl` |
-| Contraseña | `admin123` |
+| Email completo | `<USER_PREFIX>@usach.cl` |
+| Contraseña | `<TU_CONTRASEÑA_DE_PRUEBA>` |
 
 ### Perfil de credencial de infraestructura (para el Consumer)
 
@@ -89,10 +90,10 @@ Crear en **Settings → Credenciales** dentro de la app:
 | Campo | Valor |
 |---|---|
 | Nombre | `Wazuh-Contabo` (o cualquier nombre) |
-| SSH User | `sepul` |
-| SSH Password | `Sepul1995` |
-| Wazuh User | `admin` |
-| Wazuh Password | `admin` |
+| SSH User | `<SSH_USER>` |
+| SSH Password | `<SSH_PASSWORD>` |
+| Wazuh User | `<WAZUH_USER>` |
+| Wazuh Password | `<WAZUH_PASSWORD>` |
 
 ---
 
