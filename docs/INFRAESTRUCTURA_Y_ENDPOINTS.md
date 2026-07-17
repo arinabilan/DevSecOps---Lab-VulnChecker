@@ -101,14 +101,14 @@ Crear en **Settings → Credenciales** dentro de la app:
 
 ```
 [Vercel] vulnchecker-frontend.vercel.app
-  └── HTTPS → [DigitalOcean] https://157.230.177.115.nip.io/api
+  └── HTTPS → [DigitalOcean] https://<IP_DIGITALOCEAN>.nip.io/api
                   └── Spring Boot :8080
-                        └── SSH tunnel (JSch) → sepul@217.216.48.103:22
+                        └── SSH tunnel (JSch) → <SSH_USER>@<IP_CONTABO>:22
                                                    └── OpenSearch :9200
                                                          └── 2.763 vulnerabilidades
 
-[Wazuh Agent] (157.230.177.115)
-  └── reporta eventos → [Wazuh Manager] 217.216.48.103:1514
+[Wazuh Agent] (<IP_DIGITALOCEAN>)
+  └── reporta eventos → [Wazuh Manager] <IP_CONTABO>:1514
                              └── indexa → OpenSearch :9200
 ```
 
@@ -116,7 +116,7 @@ Crear en **Settings → Credenciales** dentro de la app:
 
 ## Guía de configuración — Máquina 1 (Contabo / Wazuh)
 
-**IP:** `217.216.48.103` | **Usuario SSH:** `sepul` | **Password SSH:** `Sepul1995`
+**IP:** `<IP_CONTABO>` | **Usuario SSH:** `<SSH_USER>` | **Password SSH:** `<SSH_PASSWORD>`
 
 ### 1. Requisitos previos
 
@@ -231,14 +231,14 @@ sudo systemctl restart ssh
 ### 7. Crear password para el usuario SSH
 
 ```bash
-sudo passwd sepul
-# Ingresar: Sepul1995
+sudo passwd <SSH_USER>
+# Ingresar: <SSH_PASSWORD>
 ```
 
 ### 8. Verificar el Wazuh Indexer
 
 ```bash
-curl -sk -u admin:admin https://localhost:9200
+curl -sk -u <WAZUH_USER>:<WAZUH_PASSWORD> https://localhost:9200
 # Respuesta esperada: { "name": "wazuh.indexer", "cluster_name": "wazuh-cluster" }
 ```
 
@@ -246,14 +246,14 @@ curl -sk -u admin:admin https://localhost:9200
 
 | Servicio | URL | Credenciales |
 |---|---|---|
-| Wazuh Dashboard | `https://217.216.48.103:4430` | admin / admin |
-| Wazuh Indexer API | `https://217.216.48.103:9200` | admin / admin |
+| Wazuh Dashboard | `https://<IP_CONTABO>:4430` | `<WAZUH_USER>` / `<WAZUH_PASSWORD>` |
+| Wazuh Indexer API | `https://<IP_CONTABO>:9200` | `<WAZUH_USER>` / `<WAZUH_PASSWORD>` |
 
 ---
 
 ## Guía de configuración — Máquina 2 (DigitalOcean / Backend)
 
-**IP:** `157.230.177.115` | **Usuario:** `root`
+**IP:** `<IP_DIGITALOCEAN>` | **Usuario:** `root`
 
 ### 1. Crear el Droplet en DigitalOcean
 
@@ -270,7 +270,7 @@ curl -sSL https://dokploy.com/install.sh | bash
 
 > Usar `bash`, no `sh` — el script usa sintaxis bash que `sh` no entiende.
 
-Dokploy queda accesible en `http://157.230.177.115:3000`. Registrarse en el primer acceso.
+Dokploy queda accesible en `http://<IP_DIGITALOCEAN>:3000`. Registrarse en el primer acceso.
 
 ### 3. Crear la base de datos en Dokploy
 
@@ -279,10 +279,10 @@ En Dokploy → **New Service → Database → PostgreSQL**:
 | Campo | Valor |
 |---|---|
 | Database Name | `vulncheck` |
-| User | `admin` |
-| Password | `admin123` |
+| User | `<DB_USER>` |
+| Password | `<DB_PASSWORD>` |
 
-Dokploy asigna un **Internal Host** (ej. `bilan-vulncheck-qg6jib`) para comunicación entre contenedores.
+Dokploy asigna un **Internal Host** (ej. `<DOKPLOY_INTERNAL_HOST>`) para comunicación entre contenedores.
 
 ### 4. Crear el Application del backend en Dokploy
 
@@ -303,18 +303,18 @@ En Dokploy → **New Service → Application**:
 En la pestaña **Environment** del Application:
 
 ```env
-DB_USERNAME=admin
-DB_PASSWORD=admin123
-DB_O_LOCALHOST=bilan-vulncheck-qg6jib
-SPRING_DATASOURCE_URL=jdbc:postgresql://bilan-vulncheck-qg6jib:5432/vulncheck
-SPRING_DATASOURCE_USERNAME=admin
-SPRING_DATASOURCE_PASSWORD=admin123
+DB_USERNAME=<DB_USER>
+DB_PASSWORD=<DB_PASSWORD>
+DB_O_LOCALHOST=<DOKPLOY_INTERNAL_HOST>
+SPRING_DATASOURCE_URL=jdbc:postgresql://<DOKPLOY_INTERNAL_HOST>:5432/vulncheck
+SPRING_DATASOURCE_USERNAME=<DB_USER>
+SPRING_DATASOURCE_PASSWORD=<DB_PASSWORD>
 SPRING_JPA_HIBERNATE_DDL_AUTO=update
 SPRING_FLYWAY_ENABLED=true
 cors.allowed-origins=https://vulnchecker-frontend.vercel.app
 ```
 
-> Reemplazar `bilan-vulncheck-qg6jib` con el Internal Host real asignado por Dokploy.
+> Reemplazar `<DOKPLOY_INTERNAL_HOST>` con el Internal Host real asignado por Dokploy.
 > La variable `cors.allowed-origins` permite que el frontend en Vercel pueda llamar al backend.
 
 ### 6. Configurar dominio en Dokploy
@@ -323,7 +323,7 @@ En la pestaña **Domains** del Application:
 
 | Campo | Valor |
 |---|---|
-| Host | `157.230.177.115.nip.io` |
+| Host | `<IP_DIGITALOCEAN>.nip.io` |
 | Path | `/` |
 | Port | `8080` |
 | HTTPS | **Yes** (Let's Encrypt) |
@@ -337,7 +337,7 @@ Click en **Deploy**. El build tarda ~3-5 minutos (Maven descarga dependencias).
 ### 8. Verificar que el backend está activo
 
 ```bash
-curl https://157.230.177.115.nip.io/actuator/health
+curl https://<IP_DIGITALOCEAN>.nip.io/actuator/health
 # {"status":"UP"}
 ```
 
@@ -349,10 +349,10 @@ El agente se instala en el Droplet de DigitalOcean para monitorear ese servidor 
 
 ### 1. Obtener el comando de instalación desde el Dashboard
 
-En `https://217.216.48.103:4430` → **Deploy new agent**:
+En `https://<IP_CONTABO>:4430` → **Deploy new agent**:
 
 - Package: **DEB amd64**
-- Server address: `217.216.48.103`
+- Server address: `<IP_CONTABO>`
 - Agent name: `digitalocean-vulnchecker`
 
 ### 2. Instalar el agente
@@ -360,7 +360,7 @@ En `https://217.216.48.103:4430` → **Deploy new agent**:
 ```bash
 wget https://packages-staging.xdrsiem.wazuh.info/pre-release/5.x/apt/pool/main/w/wazuh-agent/wazuh-agent_5.0.0-beta1_amd64.deb
 
-sudo WAZUH_MANAGER='217.216.48.103' \
+sudo WAZUH_MANAGER='<IP_CONTABO>' \
      WAZUH_AGENT_GROUP='default' \
      WAZUH_AGENT_NAME='digitalocean-vulnchecker' \
      dpkg -i ./wazuh-agent_5.0.0-beta1_amd64.deb
@@ -383,7 +383,7 @@ sudo systemctl status wazuh-agent
 
 ### 5. Confirmar registro en el Dashboard
 
-En `https://217.216.48.103:4430` → **Endpoints**: debe aparecer con status **Active**.
+En `https://<IP_CONTABO>:4430` → **Endpoints**: debe aparecer con status **Active**.
 
 ### Comandos útiles del agente
 
@@ -429,7 +429,7 @@ En **Settings → Environment Variables**:
 
 | Variable | Valor |
 |---|---|
-| `VITE_API_URL` | `https://157.230.177.115.nip.io` |
+| `VITE_API_URL` | `https://<IP_DIGITALOCEAN>.nip.io` |
 
 > Esta variable se inyecta en el bundle en tiempo de build. Apunta al backend con HTTPS para evitar Mixed Content.
 
@@ -458,17 +458,17 @@ La BD de producción arranca vacía. Para poblarla:
 ### Paso 1 — Crear perfil de credenciales en la app
 
 1. Ir a `https://vulnchecker-frontend.vercel.app`
-2. Login con `admin.seguridad` / `admin123`
+2. Login con `<ADMIN_USER>` / `<ADMIN_PASSWORD>`
 3. Ir a **Settings → Credenciales**
 4. Crear nuevo perfil:
 
 | Campo | Valor |
 |---|---|
 | Nombre | `Wazuh-Contabo` |
-| SSH User | `sepul` |
-| SSH Password | `Sepul1995` |
-| Wazuh User | `admin` |
-| Wazuh Password | `admin` |
+| SSH User | `<SSH_USER>` |
+| SSH Password | `<SSH_PASSWORD>` |
+| Wazuh User | `<WAZUH_USER>` |
+| Wazuh Password | `<WAZUH_PASSWORD>` |
 
 ### Paso 2 — Ejecutar sincronización
 
@@ -477,7 +477,7 @@ La BD de producción arranca vacía. Para poblarla:
 
 | Campo | Valor |
 |---|---|
-| Dirección IP | `217.216.48.103` |
+| Dirección IP | `<IP_CONTABO>` |
 | Perfil de Credencial | `Wazuh-Contabo` |
 
 3. Click en **"Iniciar Consumo de Datos"**
@@ -489,18 +489,18 @@ El proceso corre en background (~5-10 minutos para 2.763 registros). La pantalla
 ## Variables y endpoints para pruebas con curl
 
 ```bash
-BASE="https://157.230.177.115.nip.io/api/vulns"
-SSH_HOST="217.216.48.103"
-SSH_USER="sepul"
-SSH_PASS="Sepul1995"
-WAZUH_AUTH="Authorization: Basic $(echo -n 'admin:admin' | base64)"
+BASE="https://<IP_DIGITALOCEAN>.nip.io/api/vulns"
+SSH_HOST="<IP_CONTABO>"
+SSH_USER="<SSH_USER>"
+SSH_PASS="<SSH_PASSWORD>"
+WAZUH_AUTH="Authorization: Basic $(echo -n '<WAZUH_USER>:<WAZUH_PASSWORD>' | base64)"
 ```
 
 ### Sistema
 
 ```bash
 # Health check
-curl https://157.230.177.115.nip.io/actuator/health
+curl https://<IP_DIGITALOCEAN>.nip.io/actuator/health
 # {"status":"UP"}
 
 # Vulnerabilidades sincronizadas en BD local
@@ -552,14 +552,14 @@ curl --max-time 30 -H "$WAZUH_AUTH" \
 curl -X POST --max-time 30 \
   -H "Content-Type: application/json" \
   -H "$WAZUH_AUTH" \
-  -d '{"ip":"217.216.48.103","infrastructureCredentialId":1}' \
+  -d '{"ip":"<IP_CONTABO>","infrastructureCredentialId":1}' \
   "$BASE/remote-count"
 
 # Iniciar sincronización (corre en background)
 curl -X POST --max-time 30 \
   -H "Content-Type: application/json" \
   -H "$WAZUH_AUTH" \
-  -d '{"ip":"217.216.48.103","infrastructureCredentialId":1}' \
+  -d '{"ip":"<IP_CONTABO>","infrastructureCredentialId":1}' \
   "$BASE/consume"
 ```
 
