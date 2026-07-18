@@ -46,7 +46,7 @@ public class WazuhService {
     private final VulnerabilityRepository vulnerabilityRepository;
     private final VulnerabilitySnapshotRepository snapshotRepository;
     private final AgentRepository agentRepository;
-    private final VulnerabilityTimelineService timelineService;
+    //private final VulnerabilityTimelineService timelineService;
     private final Executor taskExecutor;
 
     public WazuhService(SshTunnelManager tunnelManager,
@@ -54,14 +54,14 @@ public class WazuhService {
                         VulnerabilityRepository vulnerabilityRepository,
                         VulnerabilitySnapshotRepository snapshotRepository,
                         AgentRepository agentRepository,
-                        VulnerabilityTimelineService timelineService,
+                        //VulnerabilityTimelineService timelineService,
                         @Qualifier("wazuhTaskExecutor") Executor taskExecutor) {
         this.tunnelManager = tunnelManager;
         this.restTemplate = restTemplate;
         this.vulnerabilityRepository = vulnerabilityRepository;
         this.snapshotRepository = snapshotRepository;
         this.agentRepository = agentRepository;
-        this.timelineService = timelineService;
+        //this.timelineService = timelineService;
         this.taskExecutor = taskExecutor;
     }
 
@@ -311,7 +311,7 @@ public class WazuhService {
         for (VulnerabilityEntity vuln : currentlyActive) {
             if (!seenIds.contains(vuln.getId())) {
                 resolvedIds.add(vuln.getId());
-                timelineService.registerEvent(vuln, vuln.getStatus(), "RESOLVED", "RESOLVED");
+                //timelineService.registerEvent(vuln, vuln.getStatus(), "RESOLVED", "RESOLVED");
             }
         }
         if (!resolvedIds.isEmpty()) {
@@ -451,7 +451,7 @@ public class WazuhService {
         if (!toSave.isEmpty()) {
             List<VulnerabilityEntity> saved = vulnerabilityRepository.saveAll(toSave);
             for (VulnerabilityEntity v : saved) {
-                timelineService.registerEvent(v, null, "ACTIVE", "DETECTED");
+                //timelineService.registerEvent(v, null, "ACTIVE", "DETECTED");
                 seenIds.add(v.getId());
                 activeByKey.put(buildKey(v.getCve(), v.getAgentId(), v.getPackageName()), v);
             }

@@ -4,27 +4,29 @@ name: vulnchecker
 
 services:
   db:
-    image: postgres:16-alpine
-    container_name: vuln-db
-    networks:
-      - app_internal
-    environment:
-      - POSTGRES_DB=vulncheck
-      - POSTGRES_USER=${DB_USERNAME:-vulnuser}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-vulnpass}
-    ports:
-      - '127.0.0.1:5433:5432'
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-vulnuser} -d vulncheck"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    security_opt:
-      - no-new-privileges:true
-    read_only: false  # PostgreSQL necesita escribir en su volumen
-    tmpfs:
-      - /tmp
-    restart: unless-stopped
+      image: timescale/timescaledb:latest-pg16 # imagen oficial de TimescaleDB (PostgreSQL 16) 
+      container_name: vuln-db
+      networks:
+        - app_internal
+      environment:
+        - POSTGRES_DB=vulncheck
+        - POSTGRES_USER=${DB_USERNAME:-vulnuser}
+        - POSTGRES_PASSWORD=${DB_PASSWORD:-vulnpass}
+      ports:
+        - '127.0.0.1:5433:5432'
+      #volumes: # volumen persistente
+      #  - timescale_data:/var/lib/postgresql/data
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-vulnuser} -d vulncheck"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+      security_opt:
+        - no-new-privileges:true
+      read_only: false  # PostgreSQL necesita escribir en su volumen
+      tmpfs:
+        - /tmp
+      restart: unless-stopped
 
   backend:
     build:
@@ -46,8 +48,8 @@ services:
       - DB_USERNAME=${DB_USERNAME:-vulnuser}
       - DB_PASSWORD=${DB_PASSWORD:-vulnpass}
       - DB_O_LOCALHOST=db
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/vulncheck
-      - SPRING_FLYWAY_URL=jdbc:postgresql://db:5432/vulncheck
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/vulncheck # spring boot reconoce esta variable y la usa para conectarse a la BD
+      - SPRING_FLYWAY_URL=jdbc:postgresql://db:5432/vulncheck # spring boot reconoce esta variable y la usa para migrar la BD
     command: /app/mvnw spring-boot:run
     depends_on:
       db:
@@ -245,13 +247,14 @@ services:
 networks:
   app_internal:
     name: vulnchecker_app_internal
-    internal: true   # Sin salida a internet; solo backend (vía devsecops_net) y db
+    internal: false   # Sin salida a internet; solo backend (vía devsecops_net) y db
   devsecops_net:
     name: vulnchecker_devsecops
   sonarnet:
     name: vulnchecker_sonarnet
 
 volumes:
+  timescale_data:
   sonar_db_data:
   sonarqube_data:
   jenkins_home:
