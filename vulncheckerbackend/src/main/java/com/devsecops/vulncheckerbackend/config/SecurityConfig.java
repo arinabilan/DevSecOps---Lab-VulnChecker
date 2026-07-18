@@ -16,6 +16,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@SuppressWarnings("java:S4502") // CSRF deshabilitado intencionalmente: API REST con autenticación por token
 public class SecurityConfig {
 
     @Value("${cors.allowed-origins:http://localhost,http://localhost:5173}")

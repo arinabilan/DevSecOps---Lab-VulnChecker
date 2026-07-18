@@ -1,5 +1,6 @@
 package com.devsecops.vulncheckerbackend.controllers;
 
+import com.devsecops.vulncheckerbackend.dto.AgentRequest;
 import com.devsecops.vulncheckerbackend.entities.AgentEntity;
 import com.devsecops.vulncheckerbackend.services.AgentService;
 import org.springframework.http.ResponseEntity;
@@ -36,16 +37,30 @@ public class AgentController {
     }
 
     @PostMapping
-    public AgentEntity create(@RequestBody AgentEntity agent) {
+    public AgentEntity create(@RequestBody AgentRequest request) {
+        AgentEntity agent = new AgentEntity();
+        agent.setWazuhAgentId(request.getWazuhAgentId());
+        agent.setName(request.getName());
+        agent.setVersion(request.getVersion());
+        agent.setOsType(request.getOsType());
+        agent.setOsFullName(request.getOsFullName());
+        agent.setOsPlataform(request.getOsPlataform());
         return agentService.save(agent);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<AgentEntity> update(@PathVariable Long id, @RequestBody AgentEntity agent) {
+    public ResponseEntity<AgentEntity> update(@PathVariable Long id, @RequestBody AgentRequest request) {
         if (!agentService.findById(id).isPresent()) {
             return ResponseEntity.notFound().build();
         }
+        AgentEntity agent = new AgentEntity();
         agent.setId(id);
+        agent.setWazuhAgentId(request.getWazuhAgentId());
+        agent.setName(request.getName());
+        agent.setVersion(request.getVersion());
+        agent.setOsType(request.getOsType());
+        agent.setOsFullName(request.getOsFullName());
+        agent.setOsPlataform(request.getOsPlataform());
         return ResponseEntity.ok(agentService.save(agent));
     }
 

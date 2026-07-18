@@ -36,7 +36,7 @@ public class SshTunnelManager {
     private static final int    WAZUH_API_PORT = 9200;
 
     // Tiempo de inactividad máximo antes de cerrar la sesión (en milisegundos)
-    private static final long   IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
+    private static final long   IDLE_TIMEOUT_MS = 5L * 60 * 1000; // 5 minutos
 
     /**
      * Estructura que guarda una sesión junto con el timestamp de su último uso y el puerto local asignado.

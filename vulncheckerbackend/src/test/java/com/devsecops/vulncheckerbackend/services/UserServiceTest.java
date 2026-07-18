@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -93,5 +94,83 @@ class UserServiceTest {
 
         assertEquals("encoded-pass", saved.getPassword());
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void findByActiveFalse_returnsInactiveUsers() {
+        List<UserEntity> inactive = List.of(TestDataFactory.user(2L));
+        when(userRepository.findByActiveFalse()).thenReturn(inactive);
+
+        List<UserEntity> result = userService.findByActiveFalse();
+
+        assertEquals(1, result.size());
+        verify(userRepository).findByActiveFalse();
+    }
+
+    @Test
+    void findByEmail_returnsUserWhenFound() {
+        UserEntity user = TestDataFactory.user(1L);
+        when(userRepository.findByEmail("admin.seguridad@usach.cl")).thenReturn(Optional.of(user));
+
+        Optional<UserEntity> result = userService.findByEmail("admin.seguridad@usach.cl");
+
+        assertTrue(result.isPresent());
+        assertEquals("admin.seguridad@usach.cl", result.get().getEmail());
+    }
+
+    @Test
+    void findByEmail_returnsEmptyWhenNotFound() {
+        when(userRepository.findByEmail("unknown@test.cl")).thenReturn(Optional.empty());
+
+        Optional<UserEntity> result = userService.findByEmail("unknown@test.cl");
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void findAll_returnsAllUsers() {
+        List<UserEntity> users = List.of(TestDataFactory.user(1L), TestDataFactory.user(2L));
+        when(userRepository.findAll()).thenReturn(users);
+
+        List<UserEntity> result = userService.findAll();
+
+        assertEquals(2, result.size());
+        verify(userRepository).findAll();
+    }
+
+    @Test
+    void findById_returnsUserWhenFound() {
+        UserEntity user = TestDataFactory.user(1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        Optional<UserEntity> result = userService.findById(1L);
+
+        assertTrue(result.isPresent());
+        assertEquals(1L, result.get().getId());
+    }
+
+    @Test
+    void findById_returnsEmptyWhenNotFound() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        Optional<UserEntity> result = userService.findById(99L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void deleteById_delegatesToRepository() {
+        userService.deleteById(1L);
+
+        verify(userRepository).deleteById(1L);
+    }
+
+    @Test
+    void saveDirectly_persistsWithoutEncoding() {
+        UserEntity user = TestDataFactory.user(1L);
+        userService.saveDirectly(user);
+
+        verify(userRepository).save(user);
+        verify(passwordEncoder, never()).encode(any());
     }
 }

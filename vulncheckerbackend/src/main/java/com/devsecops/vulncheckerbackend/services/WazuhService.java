@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -24,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -207,7 +207,7 @@ public class WazuhService {
         });
     }
 
-    @Transactional
+    @SuppressWarnings("java:S2229")
     public void performSync(WazuhCredentials creds, String taskId, SseEmitter emitter) throws Exception {
         // 1. Obtener la fecha de la última sincronización exitosa
         LocalDateTime lastSync = vulnerabilityRepository.findMaxLastSync();
@@ -396,7 +396,7 @@ public class WazuhService {
                 agent.setOsType(osType);
                 agent.setOsFullName(osFullName);
                 agent.setOsPlataform(osPlatform);
-                agent.setLastSeen(LocalDateTime.now());
+                agent.setLastSeen(LocalDateTime.now(ZoneOffset.UTC));
                 agent = agentRepository.save(agent);
                 Long agentIdNum = agent.getId();
 
@@ -439,7 +439,7 @@ public class WazuhService {
                     entity.setCvss3Score(cvssScore);
                     entity.setDetectionTime(detectedAt);
                     entity.setLastDetection(detectedAt);
-                    entity.setLastSync(LocalDateTime.now());
+                    entity.setLastSync(LocalDateTime.now(ZoneOffset.UTC));
                     toSave.add(entity);
                 }
             } catch (Exception e) {
@@ -473,8 +473,8 @@ public class WazuhService {
         existing.setPackageVersion(pkgVersion);
         existing.setPackageType(pkgType);
         existing.setDescription(pkgDescription);
-        existing.setLastDetection(LocalDateTime.now());
-        existing.setLastSync(LocalDateTime.now());
+        existing.setLastDetection(LocalDateTime.now(ZoneOffset.UTC));
+        existing.setLastSync(LocalDateTime.now(ZoneOffset.UTC));
     }
 
     private String buildKey(String cve, Long agentId, String packageName) {

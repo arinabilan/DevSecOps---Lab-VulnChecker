@@ -2,6 +2,7 @@ package com.devsecops.vulncheckerbackend.entities;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "credentials")
@@ -29,7 +30,7 @@ public class CredentialEntity {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     // Getters y Setters
