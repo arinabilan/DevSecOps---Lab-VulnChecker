@@ -192,7 +192,7 @@ public class WazuhService {
         taskExecutor.execute(() -> {
             log.info("INICIANDO EXTRACCIÓN INCREMENTAL PARA: {}, taskId: {}", creds.sshHost(), taskId);
             try {
-                performSync(creds, taskId, emitter);
+                performSync(creds, taskId, emitter, true);
                 emitter.send(SseEmitter.event().name("complete").data(Map.of("status", "done")));
                 emitter.complete();
             } catch (Exception e) {
@@ -207,33 +207,55 @@ public class WazuhService {
         });
     }
 
+    /**
+     * Realiza la sincronización incremental de vulnerabilidades desde Wazuh.
+     * <p>
+     * 1. Obtiene la fecha de la última sincronización exitosa.
+     * 2. Recupera las vulnerabilidades activas actuales de la base de datos.
+     * 3. Realiza paginación sobre Wazuh para obtener vulnerabilidades nuevas o actualizadas.
+     * 4. Guarda snapshots de conteo por agente.
+     * 5. Resuelve vulnerabilidades que ya no aparecen en la sincronización.
+     * <p>
+     * Se envía progreso vía SSE al cliente.
+     * <p>
+     * @param creds Credenciales de Wazuh y SSH.
+     * @param taskId Identificador único de la tarea para que el cliente frontend pueda rastrear el progreso.
+     * @param emitter Canal de comunicación asincrono SseEmitter para enviar eventos de progreso al cliente.
+     * @param forceFullSync Indica si se debe forzar una sincronización completa.
+     */
     @SuppressWarnings("java:S2229")
-    public void performSync(WazuhCredentials creds, String taskId, SseEmitter emitter) throws Exception {
-        // 1. Obtener la fecha de la última sincronización exitosa
+    public void performSync(WazuhCredentials creds, String taskId, SseEmitter emitter, boolean forceFullSync) throws Exception {
+        // 1. Decisión de estrategia: Será FULL si se solicita explícitamente O si es la primera vez que se ejecuta
         LocalDateTime lastSync = vulnerabilityRepository.findMaxLastSync();
-        boolean firstSync = (lastSync == null);
-        log.info("Última sincronización: {}", lastSync);
+        boolean executeFullQuery = forceFullSync || (lastSync == null);
+        log.info("Última sincronización en BD: {}. Estrategia elegida: {}", 
+                lastSync, executeFullQuery ? "FULL SYNC (Barrido Completo)" : "INCREMENTAL (Solo Nuevas)");
 
         // 2. Vulnerabilidades activas actuales (para luego resolver las que ya no aparecen)
         List<VulnerabilityEntity> currentlyActive = vulnerabilityRepository.findByStatus("ACTIVE");
+        // Map<Key: cve|agentId|packageName, Value: VulnerabilityEntity>
+        // una vulnerabilidad se considera única por la combinación de CVE, agente y paquete
         Map<String, VulnerabilityEntity> activeByKey = currentlyActive.stream()
                 .collect(Collectors.toMap(
                         v -> buildKey(v.getCve(), v.getAgentId(), v.getPackageName()),
                         v -> v,
                         (existing, replacement) -> existing
                 ));
+        // Set de IDs de vulnerabilidades vistas durante esta sincronización
+        // las vulnerabilidades que esten en currentlyActive pero no en seenIds se considerarán RESOLVED
         Set<Long> seenIds = new HashSet<>();
+        // Map<Key: agentId, Value: SnapshotCounter> para contar vulnerabilidades por agente y severidad
         Map<Long, SnapshotCounter> countersByAgent = new HashMap<>();
 
         // 3. Paginación sobre Wazuh (solo elementos nuevos)
         int pageSize = 2000;
-        Object[] lastSortValues = null;
+        Object[] lastSortValues = null; // cursor de paginación para Elasticsearch
         boolean hasMore = true;
         long processedTotal = 0;
 
-        // Obtener el total de elementos nuevos para el progreso
-        long remoteNewTotal = getRemoteNewCount(creds, lastSync);
-        log.info("Se sincronizarán {} vulnerabilidades nuevas", remoteNewTotal);
+        // Obtener el total de elementos para el progreso
+        long remoteNewTotal = getRemoteNewCount(creds, executeFullQuery ? null : lastSync);
+        log.info("Se procesarán {} vulnerabilidades", remoteNewTotal);
 
         Session session = tunnelManager.openTunnel(creds.sshHost(), 22, creds.sshUser(), creds.sshPassword());
         int localPort = tunnelManager.getLocalPort(session);
@@ -244,9 +266,9 @@ public class WazuhService {
                         : "";
 
                 String rangeFilter;
-                if (firstSync) {
+                if (executeFullQuery) { // Obtener todas las vulnerabilidades
                     rangeFilter = "\"query\": { \"match_all\": {} }";
-                } else {
+                } else { // si no es la primera sincronización, obtener las vulnerabilidades "gt" (greater than) lastSync
                     String isoDate = lastSync.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_INSTANT);
                     rangeFilter = String.format("""
                             "query": {
@@ -271,28 +293,33 @@ public class WazuhService {
                         }
                         """, pageSize, rangeFilter, searchAfterClause);
 
+                // Ejecutar la búsqueda en Wazuh de las ultimas 2000 vulnerabilidades a través del túnel SSH
                 Map<String, Object> response = search(body, creds.wazuhUser(), creds.wazuhPassword(), localPort);
 
                 if (response != null && response.containsKey("hits")) {
                     Map<String, Object> hitsStructure = (Map<String, Object>) response.get("hits");
                     List<Map<String, Object>> hits = (List<Map<String, Object>>) hitsStructure.get("hits");
 
+                    // Condición de salida: si no hay más hits, terminar el bucle
                     if (hits == null || hits.isEmpty()) {
                         hasMore = false;
                     } else {
                         int batchSize = hits.size();
+                        // Delegar el procesamiento del batch a procesarHitsBatch
                         processHitsBatch(hits, activeByKey, seenIds, countersByAgent);
                         processedTotal += batchSize;
 
                         // Enviar progreso vía SSE
+                        long totalForProgress = remoteNewTotal > 0 ? remoteNewTotal : 1; // Evitar división por cero
                         emitter.send(SseEmitter.event().name("progress").data(Map.of(
                                 "processed", processedTotal,
-                                "total", remoteNewTotal,
-                                "percent", (int)((double)processedTotal / remoteNewTotal * 100),
+                                "total", totalForProgress,
+                                "percent", (int)((double)processedTotal / totalForProgress * 100),
                                 "taskId", taskId
                         )));
-                        log.debug("Progreso: {}/{}", processedTotal, remoteNewTotal);
+                        log.debug("Progreso: {}/{}", processedTotal, totalForProgress);
 
+                        // Actualizar lastSortValues / el cursor de paginación (search_after) para la siguiente iteración
                         lastSortValues = ((List<Object>) hits.get(hits.size() - 1).get("sort")).toArray();
                     }
                 } else {
@@ -306,32 +333,53 @@ public class WazuhService {
         // 4. Guardar snapshots de conteo por agente
         countersByAgent.values().forEach(this::saveSnapshot);
 
-        // 5. Resolver vulnerabilidades que ya no aparecieron en esta sincronización
-        List<Long> resolvedIds = new ArrayList<>();
-        for (VulnerabilityEntity vuln : currentlyActive) {
-            if (!seenIds.contains(vuln.getId())) {
-                resolvedIds.add(vuln.getId());
-                //timelineService.registerEvent(vuln, vuln.getStatus(), "RESOLVED", "RESOLVED");
+        // 5. Conciliación de estados (RESOLVED): si se usó FULL SYNC, se resuelven las vulnerabilidades que no aparecieron en la sincronización
+        if (executeFullQuery) {
+            List<Long> resolvedIds = new ArrayList<>();
+            for (VulnerabilityEntity vuln : currentlyActive) {
+                if (!seenIds.contains(vuln.getId())) {
+                    resolvedIds.add(vuln.getId());
+                    //timelineService.registerEvent(vuln, "RESOLVED");
+                }
             }
-        }
-        if (!resolvedIds.isEmpty()) {
-            int updated = vulnerabilityRepository.updateStatusByIds(resolvedIds, "RESOLVED");
-            log.info("Se resolvieron {} vulnerabilidades", updated);
+            if (!resolvedIds.isEmpty()) {
+                int updated = vulnerabilityRepository.updateStatusByIds(resolvedIds, "RESOLVED");
+                log.info("Se resolvieron {} vulnerabilidades legítimamente por ausencia (Full Sync)", updated);
+            }
+        } else {
+            log.info("Sincronización incremental finalizada. Se omitió la resolución por ausencia para proteger registros históricos antiguos.");
         }
     }
 
     // ======================= PROCESAMIENTO DE BATCHES (ÍNTEGRO, SIN CAMBIOS) =======================
+    /**
+     * Procesa un lote de hits de vulnerabilidades desde Wazuh. 
+     * Recibe bloques crudos de información (vulnerabilidades reportadas por Wazuh en formato JSON estructurado como mapas de Java)
+     * <p>
+     * 1. Extrae información de cada hit y crea o actualiza entidades VulnerabilityEntity.
+     * 2. Evita duplicados dentro del mismo lote.
+     * 3. Actualiza el mapa de vulnerabilidades activas y el conjunto de IDs vistas.
+     * 4. Cuenta vulnerabilidades por agente y severidad para snapshots.
+     * 5. Registra eventos DETECTED para nuevas vulnerabilidades.
+     * <p>
+     * @param hits Lista de hits desde Wazuh.
+     * @param activeByKey Mapa de vulnerabilidades activas por clave única (cve|agentId|packageName).
+     * @param seenIds Conjunto de IDs de vulnerabilidades vistas durante esta sincronización.
+     * @param countersByAgent Mapa de contadores de snapshots por agente.
+     */
     @SuppressWarnings("unchecked")
     private void processHitsBatch(List<Map<String, Object>> hits,
                                   Map<String, VulnerabilityEntity> activeByKey,
                                   Set<Long> seenIds,
                                   Map<Long, SnapshotCounter> countersByAgent) {
+        // Listas para guardar vulnerabilidades que se crearán o actualizarán en la base de datos
         List<VulnerabilityEntity> toSave = new ArrayList<>();
         List<VulnerabilityEntity> toUpdate = new ArrayList<>();
-        Set<String> processedKeys = new HashSet<>(); // Evita duplicados dentro del mismo lote
+        Set<String> processedKeys = new HashSet<>(); // Set para evitar duplicados dentro del lote actual
 
         for (Map<String, Object> hit : hits) {
             try {
+                // Subestructuras de datos de Wazuh (del JSON crudo convertido a Map)
                 Map<String, Object> source = (Map<String, Object>) hit.get("_source");
                 Map<String, Object> v = (Map<String, Object>) source.get("vulnerability");
                 Map<String, Object> p = (Map<String, Object>) source.get("package");
@@ -412,35 +460,67 @@ public class WazuhService {
                 }
                 processedKeys.add(key);
 
-                // --- Buscar si ya existe en el mapa de activas (vienen de BD) ---
-                VulnerabilityEntity existing = activeByKey.get(key);
                 Double cvssScore = extractCvssScore(v);
                 LocalDateTime detectedAt = parseDateTime(v.get("detected_at"));
 
-                if (existing != null) {
-                    // Vulnerabilidad ya activa → actualizar
-                    updateExistingVulnerability(existing, severity, cvssScore, underEvaluation, ctiReference,
+                // --- Buscar si ya existe en el mapa de activas (vienen de BD) ---
+                VulnerabilityEntity existingActive = activeByKey.get(key);
+
+                if (existingActive != null) {
+                    // =================================================================
+                    // CASO 1: Vulnerabilidad ya activa -> Actualizar datos mutables
+                    // =================================================================
+                    updateExistingVulnerability(existingActive, severity, cvssScore, underEvaluation, ctiReference,
                             pkgVersion, pkgType, pkgDescription);
-                    toUpdate.add(existing);
-                    seenIds.add(existing.getId());
+                    toUpdate.add(existingActive);
+                    seenIds.add(existingActive.getId());
+                    
+                    // (No requiere evento de Timeline porque no cambia de estado)
                 } else {
-                    // Nueva vulnerabilidad → crear
-                    VulnerabilityEntity entity = new VulnerabilityEntity();
-                    entity.setCve(cve);
-                    entity.setAgentId(agentIdNum);
-                    entity.setPackageName(pkgName);
-                    entity.setPackageVersion(pkgVersion);
-                    entity.setPackageType(pkgType);
-                    entity.setSeverity(severity);
-                    entity.setStatus("ACTIVE");
-                    entity.setUnderEvaluation(underEvaluation != null ? underEvaluation : false);
-                    entity.setCtiReference(ctiReference);
-                    entity.setDescription(pkgDescription);
-                    entity.setCvss3Score(cvssScore);
-                    entity.setDetectionTime(detectedAt);
-                    entity.setLastDetection(detectedAt);
-                    entity.setLastSync(LocalDateTime.now(ZoneOffset.UTC));
-                    toSave.add(entity);
+                    // Al no estar en el mapa de activas, verificamos si ya existía como RESOLVED en la BD
+                    Optional<VulnerabilityEntity> existingResolvedOpt = vulnerabilityRepository
+                            .findByCveAndAgentIdAndPackageName(cve, agentIdNum, pkgName);
+
+                    if (existingResolvedOpt.isPresent()) {
+                        // =================================================================
+                        // CASO 2: Existía como RESOLVED -> Reactivar a status 'ACTIVE'
+                        // =================================================================
+                        VulnerabilityEntity resolvedVuln = existingResolvedOpt.get();
+                        resolvedVuln.setStatus("ACTIVE"); // Forzamos la reactivación
+                        
+                        updateExistingVulnerability(resolvedVuln, severity, cvssScore, underEvaluation, ctiReference,
+                                pkgVersion, pkgType, pkgDescription);
+                        
+                        toUpdate.add(resolvedVuln);
+                        seenIds.add(resolvedVuln.getId());
+                        
+                        // Devolver al mapa de activas por si el lote actual contiene duplicados en páginas posteriores
+                        activeByKey.put(key, resolvedVuln);
+                    } else {
+                        // =================================================================
+                        // CASO 3: Completamente Nueva -> Crear registro de cero
+                        // =================================================================
+                        VulnerabilityEntity entity = new VulnerabilityEntity();
+                        entity.setCve(cve);
+                        entity.setAgentId(agentIdNum);
+                        entity.setPackageName(pkgName);
+                        entity.setPackageVersion(pkgVersion);
+                        entity.setPackageType(pkgType);
+                        entity.setSeverity(severity);
+                        entity.setStatus("ACTIVE");
+                        entity.setUnderEvaluation(underEvaluation != null ? underEvaluation : false);
+                        entity.setCtiReference(ctiReference);
+                        entity.setDescription(pkgDescription);
+                        entity.setCvss3Score(cvssScore);
+                        entity.setDetectionTime(detectedAt);
+                        entity.setLastDetection(detectedAt);
+                        entity.setLastSync(LocalDateTime.now(ZoneOffset.UTC));
+                        
+                        toSave.add(entity);
+                    }
+
+                    // si la vulnerabilidad no estaba en existingActive, es nueva o resuelta, y se registra como ACTIVE
+                    //timelineService.registerEvent(v, "ACTIVE");
                 }
             } catch (Exception e) {
                 log.warn("Error procesando hit: {}", e.getMessage(), e);
@@ -451,12 +531,12 @@ public class WazuhService {
         if (!toSave.isEmpty()) {
             List<VulnerabilityEntity> saved = vulnerabilityRepository.saveAll(toSave);
             for (VulnerabilityEntity v : saved) {
-                //timelineService.registerEvent(v, null, "ACTIVE", "DETECTED");
                 seenIds.add(v.getId());
                 activeByKey.put(buildKey(v.getCve(), v.getAgentId(), v.getPackageName()), v);
             }
         }
-        // --- Actualizar las existentes ---
+        
+        // --- Actualizar las existentes (Tanto las del CASO 1 como las reactivadas del CASO 2) ---
         if (!toUpdate.isEmpty()) {
             vulnerabilityRepository.saveAll(toUpdate);
         }
