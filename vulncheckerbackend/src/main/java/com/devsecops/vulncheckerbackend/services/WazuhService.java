@@ -46,7 +46,7 @@ public class WazuhService {
     private final VulnerabilityRepository vulnerabilityRepository;
     private final VulnerabilitySnapshotRepository snapshotRepository;
     private final AgentRepository agentRepository;
-    //private final VulnerabilityTimelineService timelineService;
+    private final VulnerabilityTimelineService timelineService;
     private final Executor taskExecutor;
 
     public WazuhService(SshTunnelManager tunnelManager,
@@ -54,14 +54,14 @@ public class WazuhService {
                         VulnerabilityRepository vulnerabilityRepository,
                         VulnerabilitySnapshotRepository snapshotRepository,
                         AgentRepository agentRepository,
-                        //VulnerabilityTimelineService timelineService,
+                        VulnerabilityTimelineService timelineService,
                         @Qualifier("wazuhTaskExecutor") Executor taskExecutor) {
         this.tunnelManager = tunnelManager;
         this.restTemplate = restTemplate;
         this.vulnerabilityRepository = vulnerabilityRepository;
         this.snapshotRepository = snapshotRepository;
         this.agentRepository = agentRepository;
-        //this.timelineService = timelineService;
+        this.timelineService = timelineService;
         this.taskExecutor = taskExecutor;
     }
 
@@ -339,7 +339,7 @@ public class WazuhService {
             for (VulnerabilityEntity vuln : currentlyActive) {
                 if (!seenIds.contains(vuln.getId())) {
                     resolvedIds.add(vuln.getId());
-                    //timelineService.registerEvent(vuln, "RESOLVED");
+                    timelineService.registerEvent(vuln, "RESOLVED");
                 }
             }
             if (!resolvedIds.isEmpty()) {
@@ -493,6 +493,8 @@ public class WazuhService {
                         
                         toUpdate.add(resolvedVuln);
                         seenIds.add(resolvedVuln.getId());
+                        // Registrar vulnerabilidad reactivada en el timeline
+                        timelineService.registerEvent(resolvedVuln, "ACTIVE");
                         
                         // Devolver al mapa de activas por si el lote actual contiene duplicados en páginas posteriores
                         activeByKey.put(key, resolvedVuln);
@@ -517,10 +519,9 @@ public class WazuhService {
                         entity.setLastSync(LocalDateTime.now(ZoneOffset.UTC));
                         
                         toSave.add(entity);
+                        // Registrar nueva vulnerabilidad ACTIVE
+                        timelineService.registerEvent(entity, "ACTIVE");
                     }
-
-                    // si la vulnerabilidad no estaba en existingActive, es nueva o resuelta, y se registra como ACTIVE
-                    //timelineService.registerEvent(v, "ACTIVE");
                 }
             } catch (Exception e) {
                 log.warn("Error procesando hit: {}", e.getMessage(), e);

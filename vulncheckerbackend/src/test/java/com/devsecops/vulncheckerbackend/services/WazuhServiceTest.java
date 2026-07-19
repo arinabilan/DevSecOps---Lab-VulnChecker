@@ -51,10 +51,8 @@ class WazuhServiceTest {
     @Mock
     private AgentRepository agentRepository;
 
-/*
     @Mock
     private VulnerabilityTimelineService timelineService;
-*/
 
     @Mock
     private Session session;
@@ -71,7 +69,7 @@ class WazuhServiceTest {
         Executor directExecutor = Runnable::run;
         // Crear el servicio real con los mocks
         WazuhService realService = new WazuhService(tunnelManager, restTemplate, vulnerabilityRepository,
-                snapshotRepository, agentRepository, directExecutor);//, timelineService);
+                snapshotRepository, agentRepository, timelineService, directExecutor);
         // Espiar el servicio real
         spyService = spy(realService);
         this.service = spyService; // Para los tests que usen service directamente

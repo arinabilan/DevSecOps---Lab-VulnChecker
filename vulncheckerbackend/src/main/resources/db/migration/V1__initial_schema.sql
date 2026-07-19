@@ -112,8 +112,7 @@ CREATE TABLE vulnerability_timeline (
     package_name VARCHAR(255) NOT NULL,
     package_type VARCHAR(255),
     package_version VARCHAR(255),
-    status VARCHAR(255) NOT NULL,       -- 'NEW', 'FIXED', 'REOPENED'
-    os_plataform VARCHAR(255) NOT NULL, -- Para filtros rápidos sin JOINs
+    status VARCHAR(255) NOT NULL,       -- 'ACTIVE', 'RESOLVED'
     cvss3_score NUMERIC(3, 1),
     severity VARCHAR(255) NOT NULL,     -- 'Critical', 'High', 'Medium', 'Low'
 
@@ -124,4 +123,4 @@ CREATE TABLE vulnerability_timeline (
 SELECT create_hypertable('vulnerability_timeline', 'time', chunk_time_interval => INTERVAL '7 days');
 
 -- 4. Índices estratégicos optimizados para series de tiempo
-CREATE INDEX idx_timeline_filters ON vulnerability_timeline (agent_id, cve, os_plataform, severity, status, time DESC);
+CREATE INDEX idx_timeline_filters ON vulnerability_timeline (agent_id, cve, severity, status, time DESC);
