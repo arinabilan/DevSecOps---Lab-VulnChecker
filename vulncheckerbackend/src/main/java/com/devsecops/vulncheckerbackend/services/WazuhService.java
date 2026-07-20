@@ -349,7 +349,26 @@ public class WazuhService {
         } else {
             log.info("Sincronización incremental finalizada. Se omitió la resolución por ausencia para proteger registros históricos antiguos.");
         }
-    }
+
+        // IAIIIIIAIII
+        // =================================================================
+        // 6. ACTUALIZAR LAS VISTAS MATERIALIZADAS AL FINALIZAR LA CARGA
+        //La exigencia: El profesor indicó que las búsquedas más comunes (ej. "vulnerabilidades críticas") no debían consultar los miles de registros en tiempo real, sino que debían estar pre-calculadas usando procedimientos almacenados.
+        //El momento exacto: Recalcó que este cálculo debía ocurrir "después de la carga" y quedar estático.
+        // =================================================================
+        log.info("Refrescando vistas materializadas de PostgreSQL...");
+        vulnerabilityRepository.refreshVulnViews();
+        log.info("Vistas materializadas actualizadas correctamente.");
+
+        // Le avisamos al frontend que llegamos al 100% y cerramos la conexión limpiamente
+        emitter.send(SseEmitter.event().name("complete").data(Map.of(
+                "status", "FINISHED",
+                "taskId", taskId
+        )));
+        emitter.complete(); 
+        log.info("Sincronización finalizada y conexión SSE cerrada con éxito.");
+
+    } // <-- Aquí termina el método performSync 
 
     // ======================= PROCESAMIENTO DE BATCHES (ÍNTEGRO, SIN CAMBIOS) =======================
     /**
