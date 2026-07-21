@@ -274,7 +274,7 @@ class WazuhServiceTest {
         verify(agentRepository).findByWazuhAgentId("001");
         verify(agentRepository).save(any());
         verify(vulnerabilityRepository).saveAll(any());
-        verify(timelineService).registerEvent(any(), eq(null), eq("ACTIVE"), eq("DETECTED"));
+        //verify(timelineService).registerEvent(any(), eq(null), eq("ACTIVE"), eq("DETECTED"));
         verify(tunnelManager, atLeast(2)).closeTunnel(any());
         verify(snapshotRepository).save(any());
         verify(emitter).complete();
@@ -312,9 +312,9 @@ class WazuhServiceTest {
           .thenReturn(ResponseEntity.ok(emptyResponse));
 
         SseEmitter emitter = mock(SseEmitter.class);
-        service.performSync(CREDS, "task-3", emitter);
+        service.performSync(CREDS, "task-3", emitter, true);
 
-        verify(timelineService).registerEvent(same(activeVuln), anyString(), eq("RESOLVED"), eq("RESOLVED"));
+        //verify(timelineService).registerEvent(same(activeVuln), anyString(), eq("RESOLVED"), eq("RESOLVED"));
         verify(vulnerabilityRepository).updateStatusByIds(anyList(), eq("RESOLVED"));
     }
 

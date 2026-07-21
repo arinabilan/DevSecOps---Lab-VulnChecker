@@ -186,6 +186,7 @@ public class WazuhVulnController {
         log.info(">>> consumeAll llamado con ID: {}", request.getInfrastructureCredentialId());
 
         WazuhCredentials credentials = buildCredentialsFromRequest(request);
+        /*
         LocalDateTime lastSync = vulnerabilityRepository.findMaxLastSync();
         long newCount = wazuhService.getRemoteNewCount(credentials, lastSync);
 
@@ -196,6 +197,7 @@ public class WazuhVulnController {
                     "message", "Ya está sincronizado (no hay vulnerabilidades nuevas)"
             ));
         }
+        */
 
         String taskId = UUID.randomUUID().toString();
         SseEmitter emitter = new SseEmitter(300_000L); // 5 minutos de timeout
