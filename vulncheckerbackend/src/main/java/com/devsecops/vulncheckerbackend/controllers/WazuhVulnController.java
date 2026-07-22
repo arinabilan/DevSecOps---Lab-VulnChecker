@@ -177,16 +177,18 @@ public class WazuhVulnController {
     }
 
     /**
-     * Inicia una sincronización incremental.
-     * - Si no hay novedades, responde inmediatamente con alreadySynced=true.
-     * - Si hay novedades, crea un taskId, un SseEmitter, lanza la tarea asíncrona y devuelve el taskId.
+     * Cada vez que se llama inicia una sincronización total. 
      */
     @PostMapping("/consume")
     public ResponseEntity<Map<String, Object>> consumeAll(@RequestBody VulnerabilityRequest request) throws Exception {
         log.info(">>> consumeAll llamado con ID: {}", request.getInfrastructureCredentialId());
 
         WazuhCredentials credentials = buildCredentialsFromRequest(request);
-        /*
+        /**
+         * Logica para evitar consumir si no hay nuevas vulnerabilidades desde la última sincronización
+         * Comentado porque no tiene en cuenta que puedan solucionarse vulnerabilidades existentes
+         * lo que requeriria una sincronización aunque no haya nuevas vulnerabilidades.
+
         LocalDateTime lastSync = vulnerabilityRepository.findMaxLastSync();
         long newCount = wazuhService.getRemoteNewCount(credentials, lastSync);
 

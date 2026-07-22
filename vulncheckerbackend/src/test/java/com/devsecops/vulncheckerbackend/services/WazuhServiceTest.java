@@ -55,6 +55,9 @@ class WazuhServiceTest {
     private VulnerabilityTimelineService timelineService;
 
     @Mock
+    private InfrastructureCredentialService infrastructureCredentialService;
+
+    @Mock
     private Session session;
 
     private WazuhService service;
@@ -69,7 +72,7 @@ class WazuhServiceTest {
         Executor directExecutor = Runnable::run;
         // Crear el servicio real con los mocks
         WazuhService realService = new WazuhService(tunnelManager, restTemplate, vulnerabilityRepository,
-                snapshotRepository, agentRepository, timelineService, directExecutor);
+                snapshotRepository, agentRepository, infrastructureCredentialService, timelineService, directExecutor);
         // Espiar el servicio real
         spyService = spy(realService);
         this.service = spyService; // Para los tests que usen service directamente
@@ -243,7 +246,7 @@ class WazuhServiceTest {
     @Test
     void performSync_processesOnePageAndSavesSnapshots() throws Exception {
         when(vulnerabilityRepository.findMaxLastSync()).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0));
-        when(vulnerabilityRepository.findByStatus("ACTIVE")).thenReturn(List.of());
+        //when(vulnerabilityRepository.findByStatus("ACTIVE")).thenReturn(List.of());
 
         when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
         when(tunnelManager.getLocalPort(session)).thenReturn(36251);
@@ -269,7 +272,7 @@ class WazuhServiceTest {
         service.syncAllVulnerabilitiesMasive(CREDS, "task-1", emitter);
 
         verify(vulnerabilityRepository).findMaxLastSync();
-        verify(vulnerabilityRepository).findByStatus("ACTIVE");
+        //verify(vulnerabilityRepository).findByStatus("ACTIVE");
         verify(tunnelManager, atLeast(2)).openTunnel(anyString(), eq(22), anyString(), anyString());
         verify(agentRepository).findByWazuhAgentId("001");
         verify(agentRepository).save(any());
@@ -277,13 +280,13 @@ class WazuhServiceTest {
         //verify(timelineService).registerEvent(any(), eq(null), eq("ACTIVE"), eq("DETECTED"));
         verify(tunnelManager, atLeast(2)).closeTunnel(any());
         verify(snapshotRepository).save(any());
-        verify(emitter).complete();
+        verify(emitter, times(2)).complete();
     }
 
     @Test
     void syncAllVulnerabilitiesMasive_sendsErrorOnFailure() throws Exception {
         when(vulnerabilityRepository.findMaxLastSync()).thenReturn(LocalDateTime.now());
-        when(vulnerabilityRepository.findByStatus("ACTIVE")).thenReturn(List.of());
+        //when(vulnerabilityRepository.findByStatus("ACTIVE")).thenReturn(List.of());
         when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
         when(tunnelManager.getLocalPort(session)).thenReturn(36251);
         when(restTemplate.exchange(
@@ -301,7 +304,9 @@ class WazuhServiceTest {
     void performSync_resolvesActiveVulnsNotFoundInWazuh() throws Exception {
         VulnerabilityEntity activeVuln = TestDataFactory.vulnerability(1L);
         when(vulnerabilityRepository.findMaxLastSync()).thenReturn(null);
-        when(vulnerabilityRepository.findByStatus("ACTIVE")).thenReturn(List.of(activeVuln));
+        when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
+        when(vulnerabilityRepository.findByStatusAndInfrastructureCredentialsId(eq("ACTIVE"), anyLong()))
+                .thenReturn(List.of(activeVuln));
         when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
         when(tunnelManager.getLocalPort(session)).thenReturn(36251);
 
