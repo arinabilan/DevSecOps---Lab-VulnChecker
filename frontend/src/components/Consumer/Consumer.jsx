@@ -117,7 +117,7 @@ const Consumer = () => {
                 setTotalTarget(prev => prev + newCount);
 
                 // 2. Llamar al consumo (solo si hay novedades)
-                if (true) { //newCount > 0) { <- descomentar después
+                if (newCount > 0) {
                     const consumeRes = await fetch(`${API_BASE_URL}/api/vulns/consume`, {
                         method: 'POST',
                         headers: { 

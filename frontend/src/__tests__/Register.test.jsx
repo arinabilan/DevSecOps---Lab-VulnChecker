@@ -102,6 +102,14 @@ test('shows generic error on failed fetch without message', async () => {
   });
 });
 
+test('toggles password visibility', () => {
+  renderRegister();
+  const toggleBtns = document.querySelectorAll('.toggle-password-btn');
+  expect(toggleBtns.length).toBe(2);
+  fireEvent.click(toggleBtns[0]);
+  fireEvent.click(toggleBtns[1]);
+});
+
 test('shows connection error on network failure', async () => {
   vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('Network error'))));
   renderRegister();

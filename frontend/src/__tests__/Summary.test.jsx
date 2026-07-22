@@ -16,7 +16,21 @@ const emptyPage = { content: [], totalPages: 0, totalElements: 0 };
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
+
+vi.mock('jspdf', () => {
+  class MockJsPDF {
+    constructor() {
+      this.setFontSize = () => {};
+      this.text = () => {};
+      this.output = () => new Uint8Array([0x12, 0x34]).buffer;
+      this.save = () => {};
+    }
+  }
+  return { default: MockJsPDF };
+});
+vi.mock('jspdf-autotable', () => ({ default: () => {} }));
 
 function summaryMock(fail = false) {
   let fetchCount = 0;
@@ -151,8 +165,7 @@ test('clicking sort header changes sort', async () => {
   }));
   render(<MemoryRouter><Summary /></MemoryRouter>);
   expect(await screen.findByText('CVE-2024-0001')).toBeInTheDocument();
-  const sortBtn = screen.getByText(/CVE ID/i);
-  fireEvent.click(sortBtn);
+  fireEvent.click(screen.getByRole('button', { name: /CVE ID/i }));
 });
 
 test('clicking agent sort header', async () => {
@@ -162,8 +175,8 @@ test('clicking agent sort header', async () => {
   }));
   render(<MemoryRouter><Summary /></MemoryRouter>);
   expect(await screen.findByText('CVE-2024-0001')).toBeInTheDocument();
-  const btns = screen.getAllByText(/Agente/i);
-  fireEvent.click(btns[0]);
+  const agentBtns = screen.getAllByRole('button', { name: /agente/i });
+  fireEvent.click(agentBtns[0]);
 });
 
 test('clicking detection time sort header', async () => {
@@ -173,7 +186,8 @@ test('clicking detection time sort header', async () => {
   }));
   render(<MemoryRouter><Summary /></MemoryRouter>);
   expect(await screen.findByText('CVE-2024-0001')).toBeInTheDocument();
-  fireEvent.click(screen.getByText(/Detectada/i));
+  const detectBtns = screen.getAllByRole('button', { name: /detectada/i });
+  fireEvent.click(detectBtns[0]);
 });
 
 test('formatDate handles null date', async () => {
@@ -257,6 +271,89 @@ test('changing severity filter triggers re-fetch', async () => {
   await screen.findByText('CVE-2024-0001');
   const severitySelect = screen.getByDisplayValue('Todas las severidades');
   fireEvent.change(severitySelect, { target: { value: 'critical' } });
+});
+
+test('generateSecurePDF calls PDF generation and sign API', async () => {
+  vi.stubGlobal('crypto', {
+    subtle: {
+      digest: vi.fn().mockResolvedValue(new Uint8Array([0x12, 0x34]).buffer),
+    },
+  });
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/filters')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFilters) });
+    if (url && url.includes('/reports/sign')) return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(mockPage) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Summary /></MemoryRouter>);
+  expect(await screen.findByText('CVE-2024-0001')).toBeInTheDocument();
+  const pdfBtn = screen.getByText(/Exportar PDF/i);
+  fireEvent.click(pdfBtn);
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/reports/sign'), expect.objectContaining({ method: 'POST' }));
+  });
+});
+
+test('generateSecurePDF shows alert on sign error', async () => {
+  window.alert = vi.fn();
+  vi.stubGlobal('crypto', {
+    subtle: {
+      digest: vi.fn().mockResolvedValue(new Uint8Array([0x12, 0x34]).buffer),
+    },
+  });
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/filters')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFilters) });
+    if (url && url.includes('/reports/sign')) return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(mockPage) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Summary /></MemoryRouter>);
+  expect(await screen.findByText('CVE-2024-0001')).toBeInTheDocument();
+  fireEvent.click(screen.getByText(/Exportar PDF/i));
+  await waitFor(() => {
+    expect(window.alert).toHaveBeenCalledWith('Error al firmar el documento.');
+  });
+});
+
+test('navigates to previous page when on page 2', async () => {
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/filters')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFilters) });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(mockPage) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Summary /></MemoryRouter>);
+  await screen.findByText(/P.gina 1 de 5/i);
+  fireEvent.click(screen.getByText(/Siguiente/i));
+  await screen.findByText(/P.gina 2 de 5/i);
+  fireEvent.click(screen.getByText(/Anterior/i));
+  await screen.findByText(/P.gina 1 de 5/i);
+});
+
+test('generateSecurePDF shows error on network failure', async () => {
+  vi.stubGlobal('crypto', {
+    subtle: {
+      digest: vi.fn().mockResolvedValue(new Uint8Array([0x12, 0x34]).buffer),
+    },
+  });
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/filters')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFilters) });
+    if (url && url.includes('/reports/sign')) return Promise.reject(new Error('Network error'));
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(mockPage) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Summary /></MemoryRouter>);
+  expect(await screen.findByText('CVE-2024-0001')).toBeInTheDocument();
+  fireEvent.click(screen.getByText(/Exportar PDF/i));
+});
+
+test('formatDate handles invalid date string', async () => {
+  const rowBadDate = { ...mockRow, detectionTime: 'not-a-date' };
+  vi.stubGlobal('fetch', vi.fn((url) => {
+    if (url && url.includes('/filters')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFilters) });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ content: [rowBadDate], totalPages: 1, totalElements: 1 }) });
+  }));
+  render(<MemoryRouter><Summary /></MemoryRouter>);
+  await screen.findByText('not-a-date');
 });
 
 test('changing agent filter triggers re-fetch', async () => {

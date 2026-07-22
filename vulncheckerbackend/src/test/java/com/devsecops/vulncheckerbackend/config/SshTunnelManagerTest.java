@@ -6,6 +6,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -79,9 +82,17 @@ class SshTunnelManagerTest {
     }
 
     @Test
-    void closeTunnel_doesNothing_whenSessionNull() {
+    void closeTunnel_doesNothing_whenSessionNull() throws Exception {
         manager = new SshTunnelManager();
         assertDoesNotThrow(() -> manager.closeTunnel((Session) null));
+    }
+
+    @Test
+    void closeTunnelPrivate_doesNothing_whenSessionNull() throws Exception {
+        manager = new SshTunnelManager();
+        Method closePrivate = SshTunnelManager.class.getDeclaredMethod("closeTunnel", Session.class, int.class);
+        closePrivate.setAccessible(true);
+        closePrivate.invoke(manager, (Session) null, 36251);
     }
 
     @Test
@@ -110,5 +121,83 @@ class SshTunnelManagerTest {
         int port = manager.getLocalPort(unrelated);
 
         assertEquals(9201, port);
+    }
+
+    @Test
+    void getLocalPort_returnsFallback_whenNoMatchingEntryInCache() throws Exception {
+        try (MockedConstruction<JSch> mocked = mockConstruction(JSch.class, (mock, ctx) -> {
+            Session mockSession = mock(Session.class);
+            when(mockSession.isConnected()).thenReturn(true);
+            when(mockSession.setPortForwardingL(0, "127.0.0.1", 9200)).thenReturn(36251);
+            when(mock.getSession(anyString(), anyString(), anyInt())).thenReturn(mockSession);
+        })) {
+            manager = new SshTunnelManager();
+            manager.openTunnel("10.0.0.1", 22, "root", "password");
+
+            Session differentSession = mock(Session.class);
+
+            int port = manager.getLocalPort(differentSession);
+            assertEquals(9201, port);
+        }
+    }
+
+    @Test
+    void closeTunnel_public_closesFromCache_whenFound() throws Exception {
+        try (MockedConstruction<JSch> mocked = mockConstruction(JSch.class, (mock, ctx) -> {
+            Session mockSession = mock(Session.class);
+            when(mockSession.isConnected()).thenReturn(true);
+            when(mockSession.setPortForwardingL(0, "127.0.0.1", 9200)).thenReturn(36251);
+            when(mock.getSession(anyString(), anyString(), anyInt())).thenReturn(mockSession);
+        })) {
+            manager = new SshTunnelManager();
+            Session session = manager.openTunnel("10.0.0.1", 22, "root", "password");
+
+            manager.closeTunnel(session);
+
+            verify(session).delPortForwardingL(36251);
+            verify(session).disconnect();
+        }
+    }
+
+    @Test
+    void closeTunnel_public_fallback_whenSessionNotInCache() throws Exception {
+        try (MockedConstruction<JSch> mocked = mockConstruction(JSch.class, (mock, ctx) -> {
+            Session mockSession = mock(Session.class);
+            when(mockSession.isConnected()).thenReturn(true);
+            when(mockSession.setPortForwardingL(0, "127.0.0.1", 9200)).thenReturn(36251);
+            when(mock.getSession(anyString(), anyString(), anyInt())).thenReturn(mockSession);
+        })) {
+            manager = new SshTunnelManager();
+            manager.openTunnel("10.0.0.1", 22, "root", "password");
+
+            Session differentSession = mock(Session.class);
+            manager.closeTunnel(differentSession);
+
+            verify(differentSession).disconnect();
+        }
+    }
+
+    @Test
+    void closeTunnel_throwsInDelPortForwarding_doesNotPropagate() throws Exception {
+        try (MockedConstruction<JSch> mocked = mockConstruction(JSch.class, (mock, ctx) -> {
+            Session mockSession = mock(Session.class);
+            when(mockSession.isConnected()).thenReturn(true);
+            when(mockSession.setPortForwardingL(0, "127.0.0.1", 9200)).thenReturn(36251);
+            doThrow(new RuntimeException("del failed")).when(mockSession).delPortForwardingL(36251);
+            when(mock.getSession(anyString(), anyString(), anyInt())).thenReturn(mockSession);
+        })) {
+            manager = new SshTunnelManager();
+            manager.openTunnel("10.0.0.1", 22, "root", "password");
+
+            manager.destroy();
+        }
+    }
+
+    @Test
+    void evictIdleSessions_runsWithoutError_whenCacheEmpty() throws Exception {
+        manager = new SshTunnelManager();
+        Method evict = SshTunnelManager.class.getDeclaredMethod("evictIdleSessions");
+        evict.setAccessible(true);
+        evict.invoke(manager);
     }
 }
