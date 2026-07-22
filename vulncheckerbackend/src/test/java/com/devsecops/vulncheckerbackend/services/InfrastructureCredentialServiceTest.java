@@ -1,5 +1,6 @@
 package com.devsecops.vulncheckerbackend.services;
 
+import com.devsecops.vulncheckerbackend.dto.WazuhCredentials;
 import com.devsecops.vulncheckerbackend.entities.InfrastructureCredentialEntity;
 import com.devsecops.vulncheckerbackend.repositories.InfrastructureCredentialRepository;
 import com.devsecops.vulncheckerbackend.support.TestDataFactory;
@@ -81,5 +82,66 @@ class InfrastructureCredentialServiceTest {
 
         assertTrue(result.isPresent());
         assertEquals(credential, result.get());
+    }
+
+    @Test
+    void getIdByWazuhCredentials_returnsId_whenFound() {
+        WazuhCredentials creds = new WazuhCredentials("10.0.0.1", "root", "ssh-pass", "wazuh-api", "wazuh-pass");
+        InfrastructureCredentialEntity entity = TestDataFactory.infrastructureCredential(15L, 1L);
+        when(repository.findFirstBySshUserAndSshPasswordAndWazuhUserAndWazuhPassword(
+                "root", "ssh-pass", "wazuh-api", "wazuh-pass"))
+                .thenReturn(Optional.of(entity));
+
+        Long result = service.getIdByWazuhCredentials(creds);
+
+        assertEquals(15L, result);
+    }
+
+    @Test
+    void getIdByWazuhCredentials_throwsWhenNotFound() {
+        WazuhCredentials creds = new WazuhCredentials("10.0.0.1", "root", "ssh-pass", "wazuh-api", "wazuh-pass");
+        when(repository.findFirstBySshUserAndSshPasswordAndWazuhUserAndWazuhPassword(
+                "root", "ssh-pass", "wazuh-api", "wazuh-pass"))
+                .thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.getIdByWazuhCredentials(creds));
+    }
+
+    @Test
+    void findIdByWazuhCredentials_returnsEmpty_whenCredentialsNull() {
+        Optional<Long> result = service.findIdByWazuhCredentials(null);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void findIdByWazuhCredentials_returnsEmpty_whenFieldsBlank() {
+        WazuhCredentials creds = new WazuhCredentials("", "", "", "", "");
+        Optional<Long> result = service.findIdByWazuhCredentials(creds);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void findIdByWazuhCredentials_returnsEmpty_whenSshUserBlank() {
+        WazuhCredentials creds = new WazuhCredentials("10.0.0.1", "", "ssh-pass", "wazuh-api", "wazuh-pass");
+        Optional<Long> result = service.findIdByWazuhCredentials(creds);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void findById_returnsEmpty_whenNotFound() {
+        when(repository.findById(999L)).thenReturn(Optional.empty());
+
+        Optional<InfrastructureCredentialEntity> result = service.findById(999L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getByUserId_returnsEmptyList_whenNoneFound() {
+        when(repository.findByUserId(999L)).thenReturn(List.of());
+
+        List<InfrastructureCredentialEntity> result = service.getByUserId(999L);
+
+        assertTrue(result.isEmpty());
     }
 }

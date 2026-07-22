@@ -11,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -50,5 +50,14 @@ class CredentialServiceTest {
     void delete_callsRepositoryDeleteById() {
         credentialService.delete(99L);
         verify(credentialRepository).deleteById(99L);
+    }
+
+    @Test
+    void findByUserId_returnsEmptyList_whenNoneFound() {
+        when(credentialRepository.findByCreatedByUserId(999L)).thenReturn(List.of());
+
+        List<CredentialEntity> result = credentialService.findByUserId(999L);
+
+        assertTrue(result.isEmpty());
     }
 }

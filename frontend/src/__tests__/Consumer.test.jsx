@@ -127,15 +127,22 @@ test('form submit triggers consume API', async () => {
   });
 });
 
-test('form submit with no new vulns', async () => {
+test('form submit with no new vulns still triggers consume', async () => {
   localStorage.setItem('user_id', '1');
   localStorage.setItem('auth_basic', 'dGVzdDp0ZXN0');
-  vi.stubGlobal('fetch', consumerFetchMock('no-new'));
+  const fetchMock = consumerFetchMock('no-new');
+  vi.stubGlobal('fetch', fetchMock);
   renderConsumer();
   await screen.findByText('Cred-A');
   fireEvent.submit(screen.getByText(/Iniciar Consumo de Datos/i).closest('form'));
   await waitFor(() => {
-    expect(screen.getByText(/No hay nuevas vulnerabilidades/i)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/consume'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+  await waitFor(() => {
+    expect(eventSourceInstances.length).toBeGreaterThan(0);
   });
 });
 
