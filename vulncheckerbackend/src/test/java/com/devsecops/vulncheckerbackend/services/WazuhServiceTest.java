@@ -280,7 +280,7 @@ class WazuhServiceTest {
         //verify(timelineService).registerEvent(any(), eq(null), eq("ACTIVE"), eq("DETECTED"));
         verify(tunnelManager, atLeast(2)).closeTunnel(any());
         verify(snapshotRepository).save(any());
-        verify(emitter).complete();
+        verify(emitter, times(2)).complete();
     }
 
     @Test
@@ -304,7 +304,9 @@ class WazuhServiceTest {
     void performSync_resolvesActiveVulnsNotFoundInWazuh() throws Exception {
         VulnerabilityEntity activeVuln = TestDataFactory.vulnerability(1L);
         when(vulnerabilityRepository.findMaxLastSync()).thenReturn(null);
-        //when(vulnerabilityRepository.findByStatus("ACTIVE")).thenReturn(List.of(activeVuln));
+        when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
+        when(vulnerabilityRepository.findByStatusAndInfrastructureCredentialsId(eq("ACTIVE"), anyLong()))
+                .thenReturn(List.of(activeVuln));
         when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
         when(tunnelManager.getLocalPort(session)).thenReturn(36251);
 

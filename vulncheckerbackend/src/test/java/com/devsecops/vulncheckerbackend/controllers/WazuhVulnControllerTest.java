@@ -142,11 +142,11 @@ class WazuhVulnControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass"))
                         .content("{\"ip\":\"192.168.1.10\",\"infrastructureCredentialId\":1}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.alreadySynced").value(true))
-                .andExpect(jsonPath("$.message").value("Ya está sincronizado (no hay vulnerabilidades nuevas)"));
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.taskId").exists())
+                .andExpect(jsonPath("$.status").value("processing"));
 
-        verify(wazuhService, never()).syncAllVulnerabilitiesMasive(any(), any(), any());
+        verify(wazuhService).syncAllVulnerabilitiesMasive(any(), any(), any());
     }
 
     @Test
