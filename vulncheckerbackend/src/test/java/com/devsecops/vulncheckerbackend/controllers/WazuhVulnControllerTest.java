@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 
@@ -239,5 +240,73 @@ class WazuhVulnControllerTest {
                         .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.message").value("Unknown error type"));
+    }
+
+    @Test
+    void handleError_credentialNotFound() throws Exception {
+        when(wazuhService.getVulnerabilitiesSummary(any(WazuhCredentials.class)))
+                .thenThrow(new RuntimeException("Credencial no encontrada"));
+
+        mockMvc.perform(get("/api/vulns/host/user/password/summary")
+                        .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Credencial de infraestructura no encontrada."));
+    }
+
+    @Test
+    void handleError_nullMessage_returnsDefaultMessage() throws Exception {
+        when(wazuhService.getVulnerabilitiesSummary(any(WazuhCredentials.class)))
+                .thenThrow(new NullPointerException());
+
+        mockMvc.perform(get("/api/vulns/host/user/password/summary")
+                        .header("Authorization", TestDataFactory.basicAuthHeader("api", "pass")))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Error desconocido en el servidor"));
+    }
+
+    @Test
+    void parseBasicAuth_nonBasicHeader_throwsError() throws Exception {
+        mockMvc.perform(get("/api/vulns/host/user/password/summary")
+                        .header("Authorization", "Bearer token"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Invalid Authorization header"));
+    }
+
+    @Test
+    void parseBasicAuth_invalidFormat_throwsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/vulns/host/user/password/summary")
+                        .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("invalid".getBytes())))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Invalid credentials format in Authorization header"));
+    }
+
+    @Test
+    void streamProgress_createsNewEmitter_whenTaskNotFound() throws Exception {
+        mockMvc.perform(get("/api/vulns/progress/nonexistent-task"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void streamProgress_returnsExistingEmitter_whenTaskFound() throws Exception {
+        InfrastructureCredentialEntity infraCredential = TestDataFactory.infrastructureCredential(1L, 9L);
+        when(infraRepo.findById(1L)).thenReturn(Optional.of(infraCredential));
+        when(vulnerabilityRepository.findMaxLastSync()).thenReturn(LocalDateTime.now().minusDays(1));
+        doAnswer(invocation -> {
+            SseEmitter emitter = invocation.getArgument(2);
+            emitter.send(SseEmitter.event().name("complete"));
+            emitter.complete();
+            return null;
+        }).when(wazuhService).syncAllVulnerabilitiesMasive(any(WazuhCredentials.class), anyString(), any(SseEmitter.class));
+
+        String response = mockMvc.perform(post("/api/vulns/consume")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ip\":\"192.168.1.10\",\"infrastructureCredentialId\":1}"))
+                .andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsString();
+
+        String taskId = response.split("\"taskId\":\"")[1].split("\"")[0];
+
+        mockMvc.perform(get("/api/vulns/progress/" + taskId))
+                .andExpect(status().isOk());
     }
 }

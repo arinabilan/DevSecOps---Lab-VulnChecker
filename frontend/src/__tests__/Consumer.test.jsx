@@ -127,7 +127,20 @@ test('form submit triggers consume API', async () => {
   });
 });
 
-test('form submit with no new vulns still triggers consume', async () => {
+test('form submit with count-fail shows info notification', async () => {
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('auth_basic', 'dGVzdDp0ZXN0');
+  const fetchMock = consumerFetchMock('count-fail');
+  vi.stubGlobal('fetch', fetchMock);
+  renderConsumer();
+  await screen.findByText('Cred-A');
+  fireEvent.submit(screen.getByText(/Iniciar Consumo de Datos/i).closest('form'));
+  await waitFor(() => {
+    expect(screen.getByText(/No hay nuevas vulnerabilidades/i)).toBeInTheDocument();
+  });
+});
+
+test('form submit with no new vulns shows info notification', async () => {
   localStorage.setItem('user_id', '1');
   localStorage.setItem('auth_basic', 'dGVzdDp0ZXN0');
   const fetchMock = consumerFetchMock('no-new');
@@ -136,13 +149,7 @@ test('form submit with no new vulns still triggers consume', async () => {
   await screen.findByText('Cred-A');
   fireEvent.submit(screen.getByText(/Iniciar Consumo de Datos/i).closest('form'));
   await waitFor(() => {
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/consume'),
-      expect.objectContaining({ method: 'POST' })
-    );
-  });
-  await waitFor(() => {
-    expect(eventSourceInstances.length).toBeGreaterThan(0);
+    expect(screen.getByText(/No hay nuevas vulnerabilidades/i)).toBeInTheDocument();
   });
 });
 

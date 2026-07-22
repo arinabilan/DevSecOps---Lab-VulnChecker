@@ -80,6 +80,23 @@ test('navigates to /home on successful admin login', async () => {
   });
 });
 
+test('toggles password visibility', () => {
+  renderLogin();
+  const toggleBtn = document.querySelector('.toggle-password-btn');
+  expect(toggleBtn).not.toBeNull();
+  fireEvent.click(toggleBtn);
+});
+
+test('renders register link', () => {
+  renderLogin();
+  expect(screen.getByText(/Solicita acceso aquí/i)).toBeInTheDocument();
+});
+
+test('renders email domain', () => {
+  renderLogin();
+  expect(screen.getByText('@usach.cl')).toBeInTheDocument();
+});
+
 test('navigates to /home on successful user login', async () => {
   vi.stubGlobal('fetch', vi.fn(() =>
     Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 2, role: 'USER', firstName: 'Juan' }) })

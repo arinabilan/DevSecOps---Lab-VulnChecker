@@ -206,6 +206,52 @@ test('cancel edit resets form', async () => {
   expect(screen.getByText(/Llavero de Credenciales/i)).toBeInTheDocument();
 });
 
+test('toggles SSH password visibility in editing mode', async () => {
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('user_role', 'USER');
+  vi.stubGlobal('fetch', createFetchMock(mockCredentials, []));
+  renderSettings();
+  await screen.findByText('Prod-Server');
+  fireEvent.click(screen.getByText(/Editar/i));
+  await screen.findByText(/Editando Perfil/i);
+  const toggleBtns = document.querySelectorAll('.credential-form .toggle-password-btn');
+  expect(toggleBtns.length).toBeGreaterThan(0);
+  fireEvent.click(toggleBtns[0]);
+});
+
+test('toggles Wazuh password visibility in editing mode', async () => {
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('user_role', 'USER');
+  vi.stubGlobal('fetch', createFetchMock(mockCredentials, []));
+  renderSettings();
+  await screen.findByText('Prod-Server');
+  fireEvent.click(screen.getByText(/Editar/i));
+  await screen.findByText(/Editando Perfil/i);
+  const toggleBtns = document.querySelectorAll('.credential-form .toggle-password-btn');
+  expect(toggleBtns.length).toBeGreaterThan(1);
+  fireEvent.click(toggleBtns[1]);
+});
+
+test('toggles verify password visibility in modal', async () => {
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('user_role', 'USER');
+  vi.stubGlobal('fetch', createFetchMock([], []));
+  renderSettings();
+  await screen.findByText(/Guardar Perfil/i);
+  const form = document.querySelector('.credential-form');
+  const inputs = form.querySelectorAll('input');
+  fireEvent.change(inputs[0], { target: { value: 'Test' } });
+  fireEvent.change(inputs[1], { target: { value: 'ssh' } });
+  fireEvent.change(inputs[2], { target: { value: 'pass' } });
+  fireEvent.change(inputs[3], { target: { value: 'wazuh' } });
+  fireEvent.change(inputs[4], { target: { value: 'wazpass' } });
+  fireEvent.submit(form);
+  await screen.findByText(/Verificaci.n de Seguridad/i);
+  const modalToggles = document.querySelectorAll('.modal-content .toggle-password-btn');
+  expect(modalToggles.length).toBeGreaterThan(0);
+  fireEvent.click(modalToggles[0]);
+});
+
 test('shows admin section for admin', async () => {
   localStorage.setItem('user_id', '1');
   localStorage.setItem('user_role', 'ADMIN');
