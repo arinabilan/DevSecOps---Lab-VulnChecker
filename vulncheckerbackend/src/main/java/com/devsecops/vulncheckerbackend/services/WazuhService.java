@@ -46,6 +46,7 @@ public class WazuhService {
     private final VulnerabilityRepository vulnerabilityRepository;
     private final VulnerabilitySnapshotRepository snapshotRepository;
     private final AgentRepository agentRepository;
+    private final InfrastructureCredentialService infrastructureCredentialService;
     private final VulnerabilityTimelineService timelineService;
     private final Executor taskExecutor;
 
@@ -54,6 +55,7 @@ public class WazuhService {
                         VulnerabilityRepository vulnerabilityRepository,
                         VulnerabilitySnapshotRepository snapshotRepository,
                         AgentRepository agentRepository,
+                        InfrastructureCredentialService infrastructureCredentialService,
                         VulnerabilityTimelineService timelineService,
                         @Qualifier("wazuhTaskExecutor") Executor taskExecutor) {
         this.tunnelManager = tunnelManager;
@@ -61,6 +63,7 @@ public class WazuhService {
         this.vulnerabilityRepository = vulnerabilityRepository;
         this.snapshotRepository = snapshotRepository;
         this.agentRepository = agentRepository;
+        this.infrastructureCredentialService = infrastructureCredentialService;
         this.timelineService = timelineService;
         this.taskExecutor = taskExecutor;
     }
@@ -192,7 +195,7 @@ public class WazuhService {
         taskExecutor.execute(() -> {
             log.info("INICIANDO EXTRACCIÓN INCREMENTAL PARA: {}, taskId: {}", creds.sshHost(), taskId);
             try {
-                performSync(creds, taskId, emitter, true);
+                performSync(creds, taskId, emitter, true); // forceFullSync = true para sincronización completa
                 emitter.send(SseEmitter.event().name("complete").data(Map.of("status", "done")));
                 emitter.complete();
             } catch (Exception e) {
@@ -231,8 +234,9 @@ public class WazuhService {
         log.info("Última sincronización en BD: {}. Estrategia elegida: {}", 
                 lastSync, executeFullQuery ? "FULL SYNC (Barrido Completo)" : "INCREMENTAL (Solo Nuevas)");
 
-        // 2. Vulnerabilidades activas actuales (para luego resolver las que ya no aparecen)
-        List<VulnerabilityEntity> currentlyActive = vulnerabilityRepository.findByStatus("ACTIVE");
+        // 2. Vulnerabilidades activas pertenecientes al wazuh con el que se está sincronizando
+        Long infraCredId = infrastructureCredentialService.getIdByWazuhCredentials(creds);
+        List<VulnerabilityEntity> currentlyActive = vulnerabilityRepository.findByStatusAndInfrastructureCredentialsId("ACTIVE", infraCredId);
         // Map<Key: cve|agentId|packageName, Value: VulnerabilityEntity>
         // una vulnerabilidad se considera única por la combinación de CVE, agente y paquete
         Map<String, VulnerabilityEntity> activeByKey = currentlyActive.stream()
@@ -306,7 +310,7 @@ public class WazuhService {
                     } else {
                         int batchSize = hits.size();
                         // Delegar el procesamiento del batch a procesarHitsBatch
-                        processHitsBatch(hits, activeByKey, seenIds, countersByAgent);
+                        processHitsBatch(hits, activeByKey, seenIds, countersByAgent, infraCredId);
                         processedTotal += batchSize;
 
                         // Enviar progreso vía SSE
@@ -390,7 +394,8 @@ public class WazuhService {
     private void processHitsBatch(List<Map<String, Object>> hits,
                                   Map<String, VulnerabilityEntity> activeByKey,
                                   Set<Long> seenIds,
-                                  Map<Long, SnapshotCounter> countersByAgent) {
+                                  Map<Long, SnapshotCounter> countersByAgent,
+                                  Long infraCredId) {
         // Listas para guardar vulnerabilidades que se crearán o actualizarán en la base de datos
         List<VulnerabilityEntity> toSave = new ArrayList<>();
         List<VulnerabilityEntity> toUpdate = new ArrayList<>();
@@ -498,7 +503,7 @@ public class WazuhService {
                 } else {
                     // Al no estar en el mapa de activas, verificamos si ya existía como RESOLVED en la BD
                     Optional<VulnerabilityEntity> existingResolvedOpt = vulnerabilityRepository
-                            .findByCveAndAgentIdAndPackageName(cve, agentIdNum, pkgName);
+                            .findByCveAndAgentIdAndPackageNameAndInfrastructureCredentialsId(cve, agentIdNum, pkgName, infraCredId);
 
                     if (existingResolvedOpt.isPresent()) {
                         // =================================================================
@@ -524,6 +529,7 @@ public class WazuhService {
                         VulnerabilityEntity entity = new VulnerabilityEntity();
                         entity.setCve(cve);
                         entity.setAgentId(agentIdNum);
+                        entity.setInfrastructureCredentialsId(infraCredId);
                         entity.setPackageName(pkgName);
                         entity.setPackageVersion(pkgVersion);
                         entity.setPackageType(pkgType);
