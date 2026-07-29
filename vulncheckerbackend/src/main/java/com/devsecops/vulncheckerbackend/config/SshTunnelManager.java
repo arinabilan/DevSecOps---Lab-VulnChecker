@@ -112,7 +112,22 @@ public class SshTunnelManager {
         Properties config = new Properties();
         config.put("StrictHostKeyChecking", "no");
         session.setConfig(config);
+        ///////////////////////////////////////////////////////////////
+        // =========================================================================
+        // 🛠️ AQUÍ AGREGAS LOS TIMEOUTS DE RED PARA SSH:
+        // =========================================================================
+        
+        // 1. Evita que la lectura de datos por el túnel se congele infinitamente (30 segundos máximo)
+        session.setTimeout(30_000); 
 
+        // 2. Mantiene el túnel "vivo" enviando pings internos a SSH cada 15 segundos
+        session.setServerAliveInterval(15_000); 
+
+        // 3. Permite 3 intentos seguidos de "pings" fallidos antes de tumbar el túnel
+        session.setServerAliveCountMax(3); 
+        
+        // =========================================================================
+        //////////////////////////////////////////////////////////////
         session.connect(10_000); // timeout 10 segundos
 
         // Establece el forward con puerto local 0 (el sistema asigna uno libre)

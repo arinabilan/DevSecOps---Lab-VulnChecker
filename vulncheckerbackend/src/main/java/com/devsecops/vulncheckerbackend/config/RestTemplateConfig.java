@@ -35,6 +35,11 @@ public class RestTemplateConfig {
         HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
         HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
 
-        return new RestTemplate(new SimpleClientHttpRequestFactory());
+        // ⏱️ Configurar timeouts HTTP
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10_000); // 10 segundos para establecer conexión con el puerto local
+        factory.setReadTimeout(60_000);    // 60 segundos esperando la respuesta de la consulta (Elasticsearch)
+
+        return new RestTemplate(factory);
     }
 }
