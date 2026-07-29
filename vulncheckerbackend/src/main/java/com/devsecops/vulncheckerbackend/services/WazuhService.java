@@ -196,8 +196,12 @@ public class WazuhService {
             log.info("INICIANDO EXTRACCIÓN INCREMENTAL PARA: {}, taskId: {}", creds.sshHost(), taskId);
             try {
                 performSync(creds, taskId, emitter, true); // forceFullSync = true para sincronización completa
-                emitter.send(SseEmitter.event().name("complete").data(Map.of("status", "done")));
-                emitter.complete();
+                try {
+                    emitter.send(SseEmitter.event().name("complete").data(Map.of("status", "done")));
+                    emitter.complete();
+                } catch (IOException e) {
+                    log.error("No se pudo enviar evento de finalización por SSE", e);
+                }
             } catch (Exception e) {
                 log.error("ERROR CRÍTICO EN HILO DE SINCRONIZACIÓN: ", e);
                 try {
@@ -252,7 +256,7 @@ public class WazuhService {
         Map<Long, SnapshotCounter> countersByAgent = new HashMap<>();
 
         // 3. Paginación sobre Wazuh (solo elementos nuevos)
-        int pageSize = 2000;
+        int pageSize = 5000;
         Object[] lastSortValues = null; // cursor de paginación para Elasticsearch
         boolean hasMore = true;
         long processedTotal = 0;
@@ -303,7 +307,7 @@ public class WazuhService {
                 if (response != null && response.containsKey("hits")) {
                     Map<String, Object> hitsStructure = (Map<String, Object>) response.get("hits");
                     List<Map<String, Object>> hits = (List<Map<String, Object>>) hitsStructure.get("hits");
-
+                
                     // Condición de salida: si no hay más hits, terminar el bucle
                     if (hits == null || hits.isEmpty()) {
                         hasMore = false;
@@ -365,11 +369,13 @@ public class WazuhService {
         log.info("Vistas materializadas actualizadas correctamente.");
 
         // Le avisamos al frontend que llegamos al 100% y cerramos la conexión limpiamente
+        /*
         emitter.send(SseEmitter.event().name("complete").data(Map.of(
                 "status", "FINISHED",
                 "taskId", taskId
         )));
         emitter.complete(); 
+        */
         log.info("Sincronización finalizada y conexión SSE cerrada con éxito.");
 
     } // <-- Aquí termina el método performSync 
