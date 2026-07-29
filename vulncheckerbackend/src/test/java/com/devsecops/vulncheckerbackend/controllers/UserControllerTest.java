@@ -109,4 +109,32 @@ class UserControllerTest {
 
         verify(userService).deleteById(4L);
     }
+
+    @Test
+    void activateUser_returnsOk_whenUserFound() throws Exception {
+        UserEntity user = TestDataFactory.user(1L);
+        user.setActive(false);
+        when(userService.findById(1L)).thenReturn(Optional.of(user));
+
+        mockMvc.perform(patch("/api/users/1/activate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value("Usuario activado"));
+    }
+
+    @Test
+    void activateUser_returnsNotFound_whenUserMissing() throws Exception {
+        when(userService.findById(99L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(patch("/api/users/99/activate"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getPendingUsers_returnsInactiveUsers() throws Exception {
+        when(userRepository.findByActiveFalse()).thenReturn(List.of(TestDataFactory.user(2L)));
+
+        mockMvc.perform(get("/api/users/pending"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(2));
+    }
 }

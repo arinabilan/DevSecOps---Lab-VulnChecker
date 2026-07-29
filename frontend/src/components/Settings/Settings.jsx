@@ -26,14 +26,18 @@ const Settings = () => {
     const [editingId, setEditingId] = useState(null);
     const [showVerifyModal, setShowVerifyModal] = useState(false);
     const [userPasswordVerify, setUserPasswordVerify] = useState('');
+    const [showSshPass, setShowSshPass] = useState(false);
+    const [showWazuhPass, setShowWazuhPass] = useState(false);
+    const [showVerifyPassword, setShowVerifyPassword] = useState(false);
     const userId = localStorage.getItem('user_id');
+    const parsedUserId = Number.parseInt(userId, 10);
 
     const fetchData = useCallback(async () => {
         if (!userId) return;
 
         try {
             // 1. Cargar credenciales de infraestructura
-            const resInfra = await fetch(`${API_BASE_URL}/api/infra-credentials/user/${userId}`);
+            const resInfra = await fetch(`${API_BASE_URL}/api/infra-credentials/user/${parsedUserId}`);
             if (resInfra.ok) setInfraCredentials(await resInfra.json());
 
             // 2. Si es ADMIN, cargar usuarios pendientes (active = false)
@@ -44,7 +48,7 @@ const Settings = () => {
         } catch (error) { 
             console.error('Error al cargar datos:', error); 
         }
-    }, [userId, userRole]);
+    }, [parsedUserId, userRole]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -79,6 +83,8 @@ const Settings = () => {
     const cancelEdit = () => {
         setEditingId(null);
         setInfraName(''); setSshUser(''); setSshPass(''); setWazuhUser(''); setWazuhPass('');
+        setShowSshPass(false);
+        setShowWazuhPass(false);
     };
 
     const handleSubmit = (e) => {
@@ -146,13 +152,23 @@ const Settings = () => {
                         </p>
                         <div className="form-group">
                             <label><Lock size={14}/> Contraseña de acceso</label>
-                            <input 
-                                type="password" 
-                                value={userPasswordVerify} 
-                                onChange={(e) => setUserPasswordVerify(e.target.value)}
-                                placeholder="Escribe tu contraseña"
-                                autoFocus required className="modal-input"
-                            />
+                            <div className="password-input-wrapper">
+                                <input 
+                                    type={showVerifyPassword ? "text" : "password"} 
+                                    value={userPasswordVerify} 
+                                    onChange={(e) => setUserPasswordVerify(e.target.value)}
+                                    placeholder="Escribe tu contraseña"
+                                    autoFocus required className="modal-input"
+                                />
+                                <button
+                                    type="button"
+                                    className="toggle-password-btn"
+                                    onClick={() => setShowVerifyPassword(!showVerifyPassword)}
+                                    title={showVerifyPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                >
+                                    {showVerifyPassword ? '👁️' : '👁️‍🗨️'}
+                                </button>
+                            </div>
                         </div>
                         <div className="modal-actions">
                             <button type="button" className="cancel-button" onClick={() => setShowVerifyModal(false)}>Cancelar</button>
@@ -250,7 +266,17 @@ const Settings = () => {
                             </div>
                             <div className="form-group">
                                 <label><Lock size={14} /> Pass SSH {editingId && '(Nueva)'}</label>
-                                <input type="password" value={sshPass} onChange={(e) => setSshPass(e.target.value)} placeholder="••••" required={!editingId} />
+                                <div className="password-input-wrapper">
+                                    <input type={showSshPass ? "text" : "password"} value={sshPass} onChange={(e) => setSshPass(e.target.value)} placeholder="••••" required={!editingId} />
+                                    <button
+                                        type="button"
+                                        className="toggle-password-btn"
+                                        onClick={() => setShowSshPass(!showSshPass)}
+                                        title={showSshPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    >
+                                        {showSshPass ? '👁️' : '👁️‍🗨️'}
+                                    </button>
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label><User size={14} /> Usuario Wazuh</label>
@@ -258,7 +284,17 @@ const Settings = () => {
                             </div>
                             <div className="form-group">
                                 <label><Lock size={14} /> Pass Wazuh {editingId && '(Nueva)'}</label>
-                                <input type="password" value={wazuhPass} onChange={(e) => setWazuhPass(e.target.value)} placeholder="••••" required={!editingId} />
+                                <div className="password-input-wrapper">
+                                    <input type={showWazuhPass ? "text" : "password"} value={wazuhPass} onChange={(e) => setWazuhPass(e.target.value)} placeholder="••••" required={!editingId} />
+                                    <button
+                                        type="button"
+                                        className="toggle-password-btn"
+                                        onClick={() => setShowWazuhPass(!showWazuhPass)}
+                                        title={showWazuhPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    >
+                                        {showWazuhPass ? '👁️' : '👁️‍🗨️'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <button type="submit" className="save-button infra-btn" disabled={loading}>

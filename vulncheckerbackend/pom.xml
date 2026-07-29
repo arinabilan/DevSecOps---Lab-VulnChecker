@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.3</version>
+		<version>4.0.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.devsecops</groupId>
@@ -28,6 +28,10 @@
 	</scm>
 	<properties>
 		<java.version>17</java.version>
+		<jacoco.version>0.8.15</jacoco.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<!-- 2. Forzar Tomcat a la versión 11.0.22 para eliminar sus 3 CVEs críticos -->
+		<tomcat.version>11.0.22</tomcat.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -117,6 +121,28 @@
 				<groupId>org.sonarsource.scanner.maven</groupId>
 				<artifactId>sonar-maven-plugin</artifactId>
 				<version>5.0.0.4389</version>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.version}</version>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+						<configuration>
+							<propertyName>argLine</propertyName>
+						</configuration>
+					</execution>
+					<execution>
+						<id>report</id>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

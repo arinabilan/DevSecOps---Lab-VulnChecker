@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -8,6 +9,20 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/setupTests.js',
+      css: true,
+      env: {
+        VITE_API_URL: 'http://test.example.com',
+      },
+      coverage: {
+        provider: 'v8',
+        reporter: ['lcov', 'text'],
+        reportsDirectory: './coverage',
+      },
+    },
     server: {
       host: true, // Esto permite que el puerto sea accesible desde fuera del contenedor
       port: 5173,

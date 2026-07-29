@@ -101,6 +101,23 @@ class InfrastructureCredentialControllerTest {
     }
 
     @Test
+    void update_updatesPasswords_whenProvided() throws Exception {
+        InfrastructureCredentialEntity existing = TestDataFactory.infrastructureCredential(4L, 1L);
+        when(service.findById(4L)).thenReturn(Optional.of(existing));
+        when(service.save(any(InfrastructureCredentialEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(put("/api/infra-credentials/4")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Nuevo\",\"sshUser\":\"root\",\"sshPassword\":\"new-ssh-pass\",\"wazuhUser\":\"wazuh\",\"wazuhPassword\":\"new-wazuh-pass\",\"userId\":1}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<InfrastructureCredentialEntity> captor = ArgumentCaptor.forClass(InfrastructureCredentialEntity.class);
+        verify(service).save(captor.capture());
+        assertEquals("new-ssh-pass", captor.getValue().getSshPassword());
+        assertEquals("new-wazuh-pass", captor.getValue().getWazuhPassword());
+    }
+
+    @Test
     void delete_returnsNoContent() throws Exception {
         mockMvc.perform(delete("/api/infra-credentials/8"))
                 .andExpect(status().isNoContent());

@@ -15,6 +15,7 @@ public class VulncheckerbackendApplication {
         SpringApplication.run(VulncheckerbackendApplication.class, args);
     }
 
+    @SuppressWarnings("java:S2068") // fallback solo para desarrollo local; en producción definir ADMIN_PASSWORD
     @Bean
     CommandLineRunner initData(UserRepository userRepository, BCryptPasswordEncoder encoder) {
         return args -> {
@@ -24,7 +25,11 @@ public class VulncheckerbackendApplication {
                 admin.setPaternalLastName("Sistema");
                 admin.setMaternalLastName("Usach");
                 admin.setEmail("admin.seguridad@usach.cl");
-                admin.setPassword(encoder.encode("admin123")); 
+                String adminPassword = System.getenv("ADMIN_PASSWORD");
+                if (adminPassword == null || adminPassword.isBlank()) {
+                    adminPassword = "admin123";
+                }
+                admin.setPassword(encoder.encode(adminPassword)); 
                 admin.setActive(true);
                 admin.setRole("ADMIN");
                 userRepository.save(admin);

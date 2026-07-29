@@ -186,3 +186,53 @@
 .register-form-width {
     max-width: 550px !important;
 }
+
+/* Estilos para el wrapper de contraseña con ojitos */
+.password-input-wrapper {
+    display: flex;
+    align-items: center;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.password-input-wrapper input {
+    border: none !important;
+    background: transparent !important;
+    flex: 1;
+    padding: 0.8rem;
+    font-size: 1rem;
+    color: var(--text-color);
+}
+
+.password-input-wrapper input:focus {
+    outline: none;
+}
+
+.password-input-wrapper:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 4px rgba(0, 123, 255, 0.4);
+}
+
+.toggle-password-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem 0.8rem;
+    color: #888;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+}
+
+.toggle-password-btn:hover {
+    color: var(--primary-color);
+}
+
+.toggle-password-btn:focus {
+    outline: none;
+}

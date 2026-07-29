@@ -1,5 +1,6 @@
 package com.devsecops.vulncheckerbackend.controllers;
 
+import com.devsecops.vulncheckerbackend.dto.InfraCredentialRequest;
 import com.devsecops.vulncheckerbackend.entities.InfrastructureCredentialEntity;
 import com.devsecops.vulncheckerbackend.services.InfrastructureCredentialService;
 import org.springframework.http.ResponseEntity;
@@ -18,26 +19,32 @@ public class InfrastructureCredentialController {
     }
 
     @PostMapping
-    public ResponseEntity<InfrastructureCredentialEntity> create(@RequestBody InfrastructureCredentialEntity credential) {
+    public ResponseEntity<InfrastructureCredentialEntity> create(@RequestBody InfraCredentialRequest request) {
+        InfrastructureCredentialEntity credential = new InfrastructureCredentialEntity();
+        credential.setUserId(request.getUserId());
+        credential.setName(request.getName());
+        credential.setSshUser(request.getSshUser());
+        credential.setSshPassword(request.getSshPassword());
+        credential.setWazuhUser(request.getWazuhUser());
+        credential.setWazuhPassword(request.getWazuhPassword());
         return ResponseEntity.ok(service.save(credential));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<InfrastructureCredentialEntity> update(
             @PathVariable Long id, 
-            @RequestBody InfrastructureCredentialEntity credentialDetails) {
+            @RequestBody InfraCredentialRequest request) {
         
         return service.findById(id)
                 .map(existingCredential -> {
-                    existingCredential.setName(credentialDetails.getName());
-                    existingCredential.setSshUser(credentialDetails.getSshUser());
-                    // Solo actualizar contraseña si se envió una nueva
-                    if (credentialDetails.getSshPassword() != null && !credentialDetails.getSshPassword().isEmpty()) {
-                        existingCredential.setSshPassword(credentialDetails.getSshPassword());
+                    existingCredential.setName(request.getName());
+                    existingCredential.setSshUser(request.getSshUser());
+                    if (request.getSshPassword() != null && !request.getSshPassword().isEmpty()) {
+                        existingCredential.setSshPassword(request.getSshPassword());
                     }
-                    existingCredential.setWazuhUser(credentialDetails.getWazuhUser());
-                    if (credentialDetails.getWazuhPassword() != null && !credentialDetails.getWazuhPassword().isEmpty()) {
-                        existingCredential.setWazuhPassword(credentialDetails.getWazuhPassword());
+                    existingCredential.setWazuhUser(request.getWazuhUser());
+                    if (request.getWazuhPassword() != null && !request.getWazuhPassword().isEmpty()) {
+                        existingCredential.setWazuhPassword(request.getWazuhPassword());
                     }
                     
                     return ResponseEntity.ok(service.save(existingCredential));
