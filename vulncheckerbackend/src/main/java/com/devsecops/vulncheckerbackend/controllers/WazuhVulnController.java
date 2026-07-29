@@ -202,7 +202,7 @@ public class WazuhVulnController {
         */
 
         String taskId = UUID.randomUUID().toString();
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 minutos de timeout
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE); // Timeout infinito
         emitters.put(taskId, emitter);
         emitter.onCompletion(() -> emitters.remove(taskId));
         emitter.onTimeout(() -> emitters.remove(taskId));
@@ -227,7 +227,7 @@ public class WazuhVulnController {
         if (emitter == null) {
             // Si no existe (por ejemplo, por reinicio), se crea uno nuevo pero probablemente la tarea ya no está viva.
             // No obstante, se crea para no romper la conexión.
-            emitter = new SseEmitter(300_000L);
+            emitter = new SseEmitter(Long.MAX_VALUE);
             emitters.put(taskId, emitter);
             emitter.onCompletion(() -> emitters.remove(taskId));
             emitter.onTimeout(() -> emitters.remove(taskId));
