@@ -26,18 +26,6 @@ SELECT
 FROM vulnerabilities 
 WHERE EXTRACT(YEAR FROM detection_time) >= 2024;
 
--- Origen de los problemas según sistema operativo y plataforma
-CREATE MATERIALIZED VIEW mv_risk_by_os AS
-SELECT 
-    a.os_type,
-    a.os_plataform,
-    COUNT(v.id) as total_vulnerabilities,
-    SUM(CASE WHEN lower(v.severity) = 'critical' THEN 1 ELSE 0 END) as critical_count
-FROM agents a
-JOIN vulnerabilities v ON a.id = v.agent_id
-WHERE v.status = 'ACTIVE'
-GROUP BY a.os_type, a.os_plataform;
-
 -- Piezas de software más vulnerables (Top 50)
 CREATE MATERIALIZED VIEW mv_vulnerable_packages AS
 SELECT 
@@ -99,7 +87,6 @@ BEGIN
     -- vulnerabilities
     REFRESH MATERIALIZED VIEW mv_critical_vulns;
     REFRESH MATERIALIZED VIEW mv_recent_vulns;
-    REFRESH MATERIALIZED VIEW mv_risk_by_os;
     REFRESH MATERIALIZED VIEW mv_vulnerable_packages;
     
 
