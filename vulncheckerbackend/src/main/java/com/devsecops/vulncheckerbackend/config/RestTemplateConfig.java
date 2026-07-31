@@ -23,9 +23,25 @@ public class RestTemplateConfig {
         // TrustManager que acepta cualquier certificado
         TrustManager[] trustAll = new TrustManager[]{
                 new X509TrustManager() {
-                    public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+                    @Override
+                    public X509Certificate[] getAcceptedIssuers() {
+                        return new X509Certificate[0];
+                    }
+
+                    @Override
+                    public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        // Intencionadamente en blanco: este TrustManager confía en todos los certificados de cliente.
+                        // para permitir la conexión a una instancia de Wazuh con un certificado autofirmado en entornos locales/de prueba.
+                        //  En producción, valide los certificados con un almacén de confianza adecuado y elimine este comportamiento permisivo.
+                    }
+
+                    @Override
+                    public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        // Se ha dejado en blanco intencionadamente: este TrustManager confía en todos los 
+                        // certificados del servidor (por ejemplo, los autofirmados de Wazuh).
+                        // Consulte la documentación Javadoc de la clase; reemplácelo con un almacén de confianza real en producción para garantizar la 
+                        // validación del certificado.
+                    }
                 }
         };
 
