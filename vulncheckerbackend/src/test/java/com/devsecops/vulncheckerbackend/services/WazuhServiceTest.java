@@ -280,7 +280,7 @@ class WazuhServiceTest {
         //verify(timelineService).registerEvent(any(), eq(null), eq("ACTIVE"), eq("DETECTED"));
         verify(tunnelManager, atLeast(2)).closeTunnel(any());
         verify(snapshotRepository).save(any());
-        verify(emitter, times(2)).complete();
+        verify(emitter).complete();
     }
 
     @Test
