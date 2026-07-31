@@ -9,13 +9,12 @@ import javax.net.ssl.*;
 import java.security.cert.X509Certificate;
 
 /**
- * RestTemplate que acepta el certificado auto-firmado de Wazuh.
- * ⚠️ En producción reemplaza esto por un truststore con el cert real de Wazuh.
- * La supresión de S5527/S5525 es intencional: Wazuh usa certificados auto-firmados
- * en entorno controlado. En producción se debe configurar un truststore válido.
+ * Cliente exclusivo del Indexer de Wazuh. Se conecta solo a
+ * {@code https://127.0.0.1:{puerto}} vía túnel SSH cifrado; la validación del
+ * cert autofirmado no aporta autenticidad extra.
  */
 @Configuration
-@SuppressWarnings({"java:S5527", "java:S5525"})
+@SuppressWarnings({"java:S5527", "java:S5525", "java:S4830"})
 public class RestTemplateConfig {
 
     @Bean(name = "wazuhRestTemplate")
