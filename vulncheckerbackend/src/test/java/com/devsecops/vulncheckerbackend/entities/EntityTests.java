@@ -24,7 +24,7 @@ class EntityTests {
         assertNotEquals(id1, null);
         assertNotEquals(id1, "string");
         assertEquals(now, id1.getTime());
-        assertEquals(1L, id1.getAgentId());
+        assertEquals(1L, id1.getInfrastructureCredentialsId());
         assertEquals("CVE-1", id1.getCve());
         assertEquals("pkg", id1.getPackageName());
     }
@@ -33,7 +33,7 @@ class EntityTests {
     void vulnerabilityTimelineId_noArgsConstructor() {
         VulnerabilityTimelineId id = new VulnerabilityTimelineId();
         assertNull(id.getTime());
-        assertNull(id.getAgentId());
+        assertNull(id.getInfrastructureCredentialsId());
         assertNull(id.getCve());
         assertNull(id.getPackageName());
     }

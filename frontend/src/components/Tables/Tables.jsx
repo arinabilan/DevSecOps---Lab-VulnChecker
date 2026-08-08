@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, RefreshCcw, Search } from 'lucide-react';
-import { buildApiUrl } from '../../config/api';
 import './Tables.css';
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 const API_URL = `${API_BASE_URL}/api/vulnerabilities`;
@@ -159,7 +158,7 @@ const Tables = ({
                         <Search size={16} />
                         <input
                             type="text"
-                            placeholder="Buscar por CVE, agente, paquete, estado..."
+                            placeholder="Buscar por CVE, agente, paquete..."
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                         />
@@ -266,16 +265,6 @@ const Tables = ({
                                         <th className="sortable">
                                             <button
                                                 type="button"
-                                                className={`sort-header-btn ${sortConfig.key === 'status' ? 'active' : ''}`}
-                                                onClick={() => handleSort('status')}
-                                            >
-                                                <span>Estado</span>
-                                                <span className="sort-indicator">{getSortIndicator('status')}</span>
-                                            </button>
-                                        </th>
-                                        <th className="sortable">
-                                            <button
-                                                type="button"
                                                 className={`sort-header-btn ${sortConfig.key === 'detectionTime' ? 'active' : ''}`}
                                                 onClick={() => handleSort('detectionTime')}
                                             >
@@ -295,7 +284,6 @@ const Tables = ({
                                             <td>{row.severity || '-'}</td>
                                             <td>{row.cvss3Score ?? '-'}</td>
                                             <td>{`${row.packageName || '-'} ${row.packageVersion ? `(${row.packageVersion})` : ''}`.trim()}</td>
-                                            <td>{row.status || '-'}</td>
                                             <td>{formatDate(row.detectionTime)}</td>
                                             <td title={row.description || ''}>{truncateText(row.description)}</td>
                                         </tr>

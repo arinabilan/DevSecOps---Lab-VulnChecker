@@ -246,7 +246,6 @@ class WazuhServiceTest {
     @Test
     void performSync_processesOnePageAndSavesSnapshots() throws Exception {
         when(vulnerabilityRepository.findMaxLastSync()).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0));
-        //when(vulnerabilityRepository.findByStatus("ACTIVE")).thenReturn(List.of());
 
         when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
         when(tunnelManager.getLocalPort(session)).thenReturn(36251);
@@ -272,12 +271,13 @@ class WazuhServiceTest {
         service.syncAllVulnerabilitiesMasive(CREDS, "task-1", emitter);
 
         verify(vulnerabilityRepository).findMaxLastSync();
-        //verify(vulnerabilityRepository).findByStatus("ACTIVE");
+        verify(vulnerabilityRepository).findByInfrastructureCredentialsId(any());
         verify(tunnelManager, atLeast(2)).openTunnel(anyString(), eq(22), anyString(), anyString());
         verify(agentRepository).findByWazuhAgentId("001");
         verify(agentRepository).save(any());
         verify(vulnerabilityRepository).saveAll(any());
-        //verify(timelineService).registerEvent(any(), eq(null), eq("ACTIVE"), eq("DETECTED"));
+        // La línea de tiempo registra una sola vez el CVE nuevo (ACTIVE), no por agente
+        verify(timelineService).registerCveEvent(eq("CVE-2026-1000"), eq("openssl"), any(), any(), any(), eq("High"), any(), eq("ACTIVE"));
         verify(tunnelManager, atLeast(2)).closeTunnel(any());
         verify(snapshotRepository).save(any());
         verify(emitter).complete();
@@ -286,7 +286,6 @@ class WazuhServiceTest {
     @Test
     void syncAllVulnerabilitiesMasive_sendsErrorOnFailure() throws Exception {
         when(vulnerabilityRepository.findMaxLastSync()).thenReturn(LocalDateTime.now());
-        //when(vulnerabilityRepository.findByStatus("ACTIVE")).thenReturn(List.of());
         when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
         when(tunnelManager.getLocalPort(session)).thenReturn(36251);
         when(restTemplate.exchange(
@@ -305,7 +304,7 @@ class WazuhServiceTest {
         VulnerabilityEntity activeVuln = TestDataFactory.vulnerability(1L);
         when(vulnerabilityRepository.findMaxLastSync()).thenReturn(null);
         when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
-        when(vulnerabilityRepository.findByStatusAndInfrastructureCredentialsId(eq("ACTIVE"), anyLong()))
+        when(vulnerabilityRepository.findByInfrastructureCredentialsId(0L))
                 .thenReturn(List.of(activeVuln));
         when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
         when(tunnelManager.getLocalPort(session)).thenReturn(36251);
@@ -319,8 +318,11 @@ class WazuhServiceTest {
         SseEmitter emitter = mock(SseEmitter.class);
         service.performSync(CREDS, "task-3", emitter, true);
 
-        //verify(timelineService).registerEvent(same(activeVuln), anyString(), eq("RESOLVED"), eq("RESOLVED"));
-        verify(vulnerabilityRepository).updateStatusByIds(anyList(), eq("RESOLVED"));
+        // La vulnerabilidad que ya no aparece se elimina de active_vulnerabilities
+        // y se registra una sola vez (por CVE, no por agente) el evento RESOLVED en el timeline.
+        verify(timelineService).registerCveEvent(
+                eq("CVE-2026-0001"), eq("openssl"), eq(0L), eq("deb"), eq("1.0.2"), eq("High"), any(), eq("RESOLVED"));
+        verify(vulnerabilityRepository).deleteAllByIdInBatch(anyList());
     }
 
     @Test

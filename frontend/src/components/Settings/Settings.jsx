@@ -3,9 +3,7 @@ import {
     ShieldCheck, Lock, User, Server, Database, Edit2, X, 
     Users, Check, Trash2, UserCheck 
 } from 'lucide-react';
-import { buildApiUrl } from '../../config/api';
 import './Settings.css';
-
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const Settings = () => {

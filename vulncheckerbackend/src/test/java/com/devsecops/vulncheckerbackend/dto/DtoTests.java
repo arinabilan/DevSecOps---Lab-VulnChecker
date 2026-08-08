@@ -37,7 +37,6 @@ class DtoTests {
         dto.setPackageVersion("1.1.1");
         dto.setPackageType("deb");
         dto.setSeverity("High");
-        dto.setStatus("Active");
         dto.setUnderEvaluation(true);
         dto.setCtiReference("https://nvd.nist.gov/");
         dto.setDescription("Test vuln");
@@ -50,7 +49,6 @@ class DtoTests {
         assertEquals("1.1.1", dto.getPackageVersion());
         assertEquals("deb", dto.getPackageType());
         assertEquals("High", dto.getSeverity());
-        assertEquals("Active", dto.getStatus());
         assertTrue(dto.getUnderEvaluation());
         assertEquals("https://nvd.nist.gov/", dto.getCtiReference());
         assertEquals("Test vuln", dto.getDescription());

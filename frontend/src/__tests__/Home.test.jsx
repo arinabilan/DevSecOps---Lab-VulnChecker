@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { beforeEach, expect, test } from 'vitest';
 import Home from '../components/Home/Home';
 
 beforeEach(() => {

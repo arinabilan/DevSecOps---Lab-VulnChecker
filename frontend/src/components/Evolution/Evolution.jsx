@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, RefreshCcw, Search } from 'lucide-react';
-import { buildApiUrl } from '../../config/api';
 import './Evolution.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;

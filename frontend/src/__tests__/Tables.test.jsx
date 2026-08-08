@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import Tables from '../components/Tables/Tables';
 
 const mockFilters = { severities: ['critical', 'high', 'medium', 'low'], agentIds: ['agent-01', 'agent-02'] };
@@ -160,9 +160,9 @@ test('sort toggle on same column', async () => {
 test('clicking all sort headers', async () => {
   vi.stubGlobal('fetch', tableMock());
   renderTables();
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 7; i++) {
     await vi.waitFor(() => {
-      expect(document.querySelectorAll('.sort-header-btn').length).toBe(8);
+      expect(document.querySelectorAll('.sort-header-btn').length).toBe(7);
     });
     const btn = document.querySelectorAll('.sort-header-btn')[i];
     fireEvent.click(btn);

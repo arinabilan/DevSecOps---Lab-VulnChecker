@@ -9,7 +9,6 @@ public class VulnRequest {
     private String packageVersion;
     private String packageType;
     private String severity;
-    private String status;
     private Boolean underEvaluation;
     private String ctiReference;
     private String description;
@@ -33,9 +32,6 @@ public class VulnRequest {
 
     public String getSeverity() { return severity; }
     public void setSeverity(String severity) { this.severity = severity; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
 
     public Boolean getUnderEvaluation() { return underEvaluation; }
     public void setUnderEvaluation(Boolean underEvaluation) { this.underEvaluation = underEvaluation; }
