@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import Summary from '../components/Summary/Summary';
 
 const mockFilters = { severities: ['critical', 'high', 'medium', 'low'], agentIds: ['agent-01'] };

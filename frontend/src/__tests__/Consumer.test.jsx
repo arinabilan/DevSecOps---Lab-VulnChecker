@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import Consumer from '../components/Consumer/Consumer';
 
 const eventSourceInstances = [];
@@ -33,7 +33,7 @@ const mockCredentials = [
 const renderConsumer = () => render(<MemoryRouter><Consumer /></MemoryRouter>);
 
 function consumerFetchMock(behavior = 'success') {
-  return vi.fn((url, options) => {
+  return vi.fn((url) => {
     if (url && url.includes('/infra-credentials')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(mockCredentials) });
     }

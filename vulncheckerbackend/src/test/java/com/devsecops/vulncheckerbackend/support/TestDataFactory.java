@@ -58,7 +58,6 @@ public final class TestDataFactory {
         entity.setDescription("Example description");
         entity.setSeverity("High");
         entity.setCvss3Score(8.1);
-        entity.setStatus("Active");
         entity.setPackageName("openssl");
         entity.setPackageVersion("1.0.2");
         entity.setDetectionTime(LocalDateTime.of(2026, 1, 10, 9, 30));

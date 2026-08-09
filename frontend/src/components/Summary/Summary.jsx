@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { AlertCircle, RefreshCcw, Search, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { buildApiUrl } from '../../config/api';
 import './Summary.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -22,8 +21,6 @@ const truncateText = (value, max = 120) => {
     if (!value) return '-';
     return value.length > max ? `${value.slice(0, max)}...` : value;
 };
-
-const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
 
 const Summary = ({
     title = 'Resumen de Vulnerabilidades',
@@ -88,7 +85,7 @@ const Summary = ({
             setRows(content);
             setTotalPages(data.totalPages || 1);
             setTotalRecords(data.totalElements || content.length);
-        } catch (err) {
+        } catch {
             setError('No se pudo cargar la tabla desde el backend.');
         } finally {
             setLoading(false);
