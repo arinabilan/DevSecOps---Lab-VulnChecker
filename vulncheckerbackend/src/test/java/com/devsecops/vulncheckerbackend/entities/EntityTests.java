@@ -13,9 +13,9 @@ class EntityTests {
     @Test
     void vulnerabilityTimelineId_equalsAndHashCode() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        VulnerabilityTimelineId id1 = new VulnerabilityTimelineId(now, 1L, "CVE-1", "pkg");
-        VulnerabilityTimelineId id2 = new VulnerabilityTimelineId(now, 1L, "CVE-1", "pkg");
-        VulnerabilityTimelineId id3 = new VulnerabilityTimelineId(now, 2L, "CVE-2", "pkg2");
+        VulnerabilityTimelineId id1 = new VulnerabilityTimelineId(now, 1L, "CVE-1");
+        VulnerabilityTimelineId id2 = new VulnerabilityTimelineId(now, 1L, "CVE-1");
+        VulnerabilityTimelineId id3 = new VulnerabilityTimelineId(now, 2L, "CVE-2");
 
         assertEquals(id1, id1);
         assertEquals(id1, id2);
@@ -26,7 +26,6 @@ class EntityTests {
         assertEquals(now, id1.getTime());
         assertEquals(1L, id1.getInfrastructureCredentialsId());
         assertEquals("CVE-1", id1.getCve());
-        assertEquals("pkg", id1.getPackageName());
     }
 
     @Test
@@ -35,7 +34,6 @@ class EntityTests {
         assertNull(id.getTime());
         assertNull(id.getInfrastructureCredentialsId());
         assertNull(id.getCve());
-        assertNull(id.getPackageName());
     }
 
     @Test

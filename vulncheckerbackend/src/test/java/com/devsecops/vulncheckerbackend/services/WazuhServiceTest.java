@@ -23,7 +23,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -277,7 +279,7 @@ class WazuhServiceTest {
         verify(agentRepository).save(any());
         verify(vulnerabilityRepository).saveAll(any());
         // La línea de tiempo registra una sola vez el CVE nuevo (ACTIVE), no por agente
-        verify(timelineService).registerCveEvent(eq("CVE-2026-1000"), eq("openssl"), any(), any(), any(), eq("High"), any(), eq("ACTIVE"));
+        verify(timelineService).registerCveEvent(eq("CVE-2026-1000"), any(), eq("High"), any(), eq("ACTIVE"));
         verify(tunnelManager, atLeast(2)).closeTunnel(any());
         verify(snapshotRepository).save(any());
         verify(emitter).complete();
@@ -321,8 +323,261 @@ class WazuhServiceTest {
         // La vulnerabilidad que ya no aparece se elimina de active_vulnerabilities
         // y se registra una sola vez (por CVE, no por agente) el evento RESOLVED en el timeline.
         verify(timelineService).registerCveEvent(
-                eq("CVE-2026-0001"), eq("openssl"), eq(0L), eq("deb"), eq("1.0.2"), eq("High"), any(), eq("RESOLVED"));
+                eq("CVE-2026-0001"), eq(0L), eq("High"), any(), eq("RESOLVED"));
         verify(vulnerabilityRepository).deleteAllByIdInBatch(anyList());
+    }
+
+    @Test
+    void performSync_registersSingleActiveEventForCveAppearingInMultiplePackages() throws Exception {
+        when(vulnerabilityRepository.findMaxLastSync()).thenReturn(null);
+        when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
+        when(vulnerabilityRepository.findByInfrastructureCredentialsId(0L)).thenReturn(List.of());
+        when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
+        when(tunnelManager.getLocalPort(session)).thenReturn(36251);
+
+        Map<String, Object> page1 = searchResponse(List.of(
+                singleHit("CVE-2026-2000", "High", "001", "openssl", List.of(1700000001L, "a1")),
+                singleHit("CVE-2026-2000", "High", "001", "libssl", List.of(1700000001L, "a2"))
+        ));
+        Map<String, Object> emptyResponse = searchResponse(List.of());
+        when(restTemplate.exchange(
+                anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)
+        )).thenReturn(ResponseEntity.ok(Map.of("count", 2)))
+          .thenReturn(ResponseEntity.ok(page1))
+          .thenReturn(ResponseEntity.ok(emptyResponse));
+
+        AgentEntity agent = new AgentEntity();
+        agent.setId(1L);
+        agent.setWazuhAgentId("001");
+        when(agentRepository.findByWazuhAgentId("001")).thenReturn(Optional.empty());
+        when(agentRepository.save(any())).thenReturn(agent);
+        when(vulnerabilityRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.performSync(CREDS, "task-4", mock(SseEmitter.class), true);
+
+        // Mismo CVE en dos paquetes: se registra UNA sola vez (ACTIVE), sin importar el paquete
+        verify(timelineService, times(1)).registerCveEvent(eq("CVE-2026-2000"), eq(0L), eq("High"), any(), eq("ACTIVE"));
+        verify(timelineService, never()).registerCveEvent(eq("CVE-2026-2000"), eq(0L), eq("High"), any(), eq("RESOLVED"));
+    }
+
+    @Test
+    void performSync_doesNotRegisterSpuriousEventsWhenCveMovesToAnotherPackage() throws Exception {
+        VulnerabilityEntity activeVuln = TestDataFactory.vulnerability(1L); // CVE-2026-0001 en paquete openssl
+        when(vulnerabilityRepository.findMaxLastSync()).thenReturn(null);
+        when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
+        when(vulnerabilityRepository.findByInfrastructureCredentialsId(0L))
+                .thenReturn(List.of(activeVuln));
+        when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
+        when(tunnelManager.getLocalPort(session)).thenReturn(36251);
+
+        Map<String, Object> page1 = searchResponse(List.of(
+                singleHit("CVE-2026-0001", "High", "001", "libssl", List.of(1700000001L, "b1"))
+        ));
+        Map<String, Object> emptyResponse = searchResponse(List.of());
+        when(restTemplate.exchange(
+                anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)
+        )).thenReturn(ResponseEntity.ok(Map.of("count", 1)))
+          .thenReturn(ResponseEntity.ok(page1))
+          .thenReturn(ResponseEntity.ok(emptyResponse));
+
+        AgentEntity agent = new AgentEntity();
+        agent.setId(1L);
+        agent.setWazuhAgentId("001");
+        when(agentRepository.findByWazuhAgentId("001")).thenReturn(Optional.empty());
+        when(agentRepository.save(any())).thenReturn(agent);
+        when(vulnerabilityRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.performSync(CREDS, "task-5", mock(SseEmitter.class), true);
+
+        // El CVE sigue activo (cambió de paquete): no se registra ACTIVE ni RESOLVED espurios
+        verify(timelineService, never()).registerCveEvent(any(), any(), any(), any(), any());
+        verify(vulnerabilityRepository, never()).deleteAllByIdInBatch(anyList());
+    }
+
+    @Test
+    void performSync_coversVariedHitProcessingBranches() throws Exception {
+        when(vulnerabilityRepository.findMaxLastSync()).thenReturn(null);
+        when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
+        when(vulnerabilityRepository.findByInfrastructureCredentialsId(0L)).thenReturn(List.of());
+        when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
+        when(tunnelManager.getLocalPort(session)).thenReturn(36251);
+
+        List<Map<String, Object>> hits = List.of(
+                // Agente en raíz (formato nuevo), scanner presente, SO solo con name, fecha epoch millis
+                rawHit(fullSource("CVE-2026-3001", "medium", "002", Map.of("name", "Debian"), "openssl",
+                        Map.of("base", 7.5), 1700000000000L, true, true)),
+                // Duplicado exacto del anterior en el mismo lote
+                rawHit(fullSource("CVE-2026-3001", "medium", "002", Map.of("name", "Debian"), "openssl",
+                        Map.of("base", 7.5), 1700000000000L, true, true)),
+                // Severity low, SO name+version, fecha epoch seconds, sin score (score nulo)
+                rawHit(fullSource("CVE-2026-3002", "low", "003", Map.of("name", "Ubuntu", "version", "24.04"), "libssl",
+                        null, 1700000001L, false, false)),
+                // Severity desconocida (default) y score vacío (base nulo)
+                rawHit(fullSource("CVE-2026-3006", "info", "007", Map.of("name", "Suse"), "openssh",
+                        Map.of(), 1700000002L, false, false)),
+                // Hit sin vulnerability -> omitido
+                rawHit(Map.of("package", Map.of("name", "x"))),
+                // Fecha inválida -> catch en parseDateTime
+                rawHit(fullSource("CVE-2026-3003", "high", "004", Map.of("name", "CentOS"), "bash",
+                        Map.of("base", 8.0), "not-a-date", false, false)),
+                // score.base no numérico -> NumberFormatException
+                rawHit(fullSource("CVE-2026-3004", "critical", "005", Map.of("name", "Alma"), "glibc",
+                        Map.of("base", "abc"), 1700000003L, false, false)),
+                // Severity null -> SnapshotCounter ignora
+                rawHit(fullSource("CVE-2026-3005", null, "006", Map.of("name", "Rocky"), "curl",
+                        Map.of("base", 5.0), 1700000004L, false, false))
+        );
+        Map<String, Object> page1 = searchResponse(hits);
+        Map<String, Object> emptyResponse = searchResponse(List.of());
+        when(restTemplate.exchange(
+                anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)
+        )).thenReturn(ResponseEntity.ok(Map.of("count", 8)))
+          .thenReturn(ResponseEntity.ok(page1))
+          .thenReturn(ResponseEntity.ok(emptyResponse));
+
+        AgentEntity agent = new AgentEntity();
+        agent.setId(1L);
+        when(agentRepository.findByWazuhAgentId(anyString())).thenReturn(Optional.empty());
+        when(agentRepository.save(any())).thenReturn(agent);
+        when(vulnerabilityRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.performSync(CREDS, "task-6", mock(SseEmitter.class), true);
+
+        // Los 6 CVEs válidos vistos se registran una sola vez como ACTIVE
+        verify(timelineService, times(6)).registerCveEvent(any(), eq(0L), any(), any(), eq("ACTIVE"));
+        verify(vulnerabilityRepository).saveAll(anyList());
+    }
+
+    @Test
+    void performSync_updatesExistingActiveVulnerabilities() throws Exception {
+        when(vulnerabilityRepository.findMaxLastSync()).thenReturn(null);
+        when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
+        // Dos filas idénticas (mismo cve/agente/paquete) para cubrir la función de merge del toMap
+        VulnerabilityEntity dup1 = TestDataFactory.vulnerability(1L);
+        VulnerabilityEntity dup2 = TestDataFactory.vulnerability(2L);
+        when(vulnerabilityRepository.findByInfrastructureCredentialsId(0L)).thenReturn(List.of(dup1, dup2));
+        when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
+        when(tunnelManager.getLocalPort(session)).thenReturn(36251);
+
+        Map<String, Object> page1 = searchResponse(List.of(
+                singleHit("CVE-2026-0001", "High", "001", "openssl", List.of(1700000001L, "c1"))
+        ));
+        Map<String, Object> emptyResponse = searchResponse(List.of());
+        when(restTemplate.exchange(
+                anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)
+        )).thenReturn(ResponseEntity.ok(Map.of("count", 1)))
+          .thenReturn(ResponseEntity.ok(page1))
+          .thenReturn(ResponseEntity.ok(emptyResponse));
+
+        AgentEntity agent = new AgentEntity();
+        agent.setId(100L); // coincide con el agentId de las vulnerabilidades activas
+        agent.setWazuhAgentId("001");
+        when(agentRepository.findByWazuhAgentId("001")).thenReturn(Optional.of(agent));
+        when(agentRepository.save(any())).thenReturn(agent);
+
+        service.performSync(CREDS, "task-7", mock(SseEmitter.class), true);
+
+        // Caso 1: la vulnerabilidad ya estaba activa -> solo se actualiza, sin evento de timeline
+        verify(vulnerabilityRepository).saveAll(anyList());
+        verify(timelineService, never()).registerCveEvent(any(), any(), any(), any(), any());
+        verify(vulnerabilityRepository, never()).deleteAllByIdInBatch(anyList());
+    }
+
+    @Test
+    void performSync_incrementalMode_skipsResolutionAndUsesRangeFilter() throws Exception {
+        when(vulnerabilityRepository.findMaxLastSync()).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0));
+        when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
+        when(vulnerabilityRepository.findByInfrastructureCredentialsId(0L)).thenReturn(List.of());
+        when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
+        when(tunnelManager.getLocalPort(session)).thenReturn(36251);
+
+        // Respuesta con hits nulos -> termina paginación sin procesar
+        when(restTemplate.exchange(
+                anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)
+        )).thenReturn(ResponseEntity.ok(Map.of("count", 0)))
+          .thenReturn(ResponseEntity.ok(Map.of("hits", Map.of())));
+
+        service.performSync(CREDS, "task-8", mock(SseEmitter.class), false);
+
+        verify(timelineService, never()).registerCveEvent(any(), any(), any(), any(), any());
+        verify(vulnerabilityRepository, never()).deleteAllByIdInBatch(anyList());
+    }
+
+    @Test
+    void syncAllVulnerabilitiesMasive_handlesCompleteSendFailure() throws Exception {
+        when(vulnerabilityRepository.findMaxLastSync()).thenReturn(null);
+        when(infrastructureCredentialService.getIdByWazuhCredentials(any())).thenReturn(0L);
+        when(vulnerabilityRepository.findByInfrastructureCredentialsId(0L)).thenReturn(List.of());
+        when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
+        when(tunnelManager.getLocalPort(session)).thenReturn(36251);
+        when(restTemplate.exchange(
+                anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)
+        )).thenReturn(ResponseEntity.ok(Map.of("count", 0)))
+          .thenReturn(ResponseEntity.ok(searchResponse(List.of())));
+
+        SseEmitter emitter = mock(SseEmitter.class);
+        doThrow(new IOException("boom")).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+
+        service.syncAllVulnerabilitiesMasive(CREDS, "task-9", emitter);
+
+        verify(emitter, never()).complete();
+        verify(emitter, never()).completeWithError(any());
+    }
+
+    @Test
+    void syncAllVulnerabilitiesMasive_handlesErrorSendFailure() throws Exception {
+        when(vulnerabilityRepository.findMaxLastSync()).thenReturn(LocalDateTime.now());
+        when(tunnelManager.openTunnel(anyString(), eq(22), anyString(), anyString())).thenReturn(session);
+        when(tunnelManager.getLocalPort(session)).thenReturn(36251);
+        when(restTemplate.exchange(
+                anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)
+        )).thenThrow(new RuntimeException("network failure"));
+
+        SseEmitter emitter = mock(SseEmitter.class);
+        doThrow(new IOException("boom")).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+
+        service.syncAllVulnerabilitiesMasive(CREDS, "task-10", emitter);
+
+        verify(emitter, never()).complete();
+        verify(emitter, never()).completeWithError(any());
+    }
+
+    private static Map<String, Object> fullSource(String cve, String severity, String agentId, Map<String, Object> os,
+                                                  String pkgName, Object score, Object detectedAt, boolean rootAgent,
+                                                  boolean withScanner) {
+        Map<String, Object> vuln = new LinkedHashMap<>();
+        vuln.put("id", cve);
+        vuln.put("severity", severity);
+        vuln.put("under_evaluation", false);
+        if (score != null) vuln.put("score", score);
+        if (detectedAt != null) vuln.put("detected_at", detectedAt);
+        if (withScanner) vuln.put("scanner", Map.of("reference", "cti-ref"));
+
+        Map<String, Object> agent = new LinkedHashMap<>();
+        agent.put("id", agentId);
+        agent.put("name", "agent-" + agentId);
+        agent.put("version", "v5.0.0");
+        if (os != null) {
+            Map<String, Object> host = new LinkedHashMap<>();
+            host.put("os", os);
+            agent.put("host", host);
+        }
+
+        Map<String, Object> source = new LinkedHashMap<>();
+        if (rootAgent) {
+            source.put("agent", agent);
+        } else {
+            source.put("wazuh", Map.of("agent", agent));
+        }
+        if (pkgName != null) {
+            source.put("package", Map.of("name", pkgName, "version", "1.0", "type", "deb"));
+        }
+        source.put("vulnerability", vuln);
+        return source;
+    }
+
+    private static Map<String, Object> rawHit(Map<String, Object> source) {
+        return Map.of("_id", "doc", "_source", source, "sort", List.of(1700000001L, "z"));
     }
 
     @Test

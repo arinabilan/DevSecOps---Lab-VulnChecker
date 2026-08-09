@@ -249,9 +249,9 @@ public class WazuhService {
                         v -> v,
                         (existing, replacement) -> existing
                 ));
-        // Conjuntos a nivel CVE (agregado entre agentes) para detectar transiciones de estado
+        // Conjuntos a nivel CVE (agregado entre agentes y paquetes) para detectar transiciones de estado
         Set<String> previousActiveCves = currentlyActive.stream()
-                .map(v -> buildCveKey(v.getCve(), v.getPackageName()))
+                .map(v -> buildCveKey(v.getCve()))
                 .collect(Collectors.toSet());
         // Set de IDs de vulnerabilidades vistas durante esta sincronización
         // las vulnerabilidades que esten en currentlyActive pero no en seenIds se considerarán RESOLVED
@@ -347,12 +347,12 @@ public class WazuhService {
         // 4. Guardar snapshots de conteo por agente
         countersByAgent.values().forEach(this::saveSnapshot);
 
-        // 5. Registrar transiciones de estado por CVE en la línea de tiempo (agregado entre agentes):
+        // 5. Registrar transiciones de estado por CVE en la línea de tiempo (agregado entre agentes y paquetes):
         //    la línea de tiempo guarda una sola vez cada CVE, ACTIVE si al menos un agente lo tiene
-        //    y RESOLVED si ya ningún agente lo tiene. No se repite por agente.
+        //    y RESOLVED si ya ningún agente lo tiene. No se repite por agente ni por paquete.
         Map<String, VulnerabilityEntity> representativeByCve = new HashMap<>();
         for (VulnerabilityEntity vuln : activeByKey.values()) {
-            representativeByCve.putIfAbsent(buildCveKey(vuln.getCve(), vuln.getPackageName()), vuln);
+            representativeByCve.putIfAbsent(buildCveKey(vuln.getCve()), vuln);
         }
 
         // 5.1. CVEs que pasaron a estar activos (no estaban antes en la sincronización)
@@ -361,8 +361,8 @@ public class WazuhService {
         for (String cveKey : newlyActiveCves) {
             VulnerabilityEntity rep = representativeByCve.get(cveKey);
             if (rep != null) {
-                timelineService.registerCveEvent(rep.getCve(), rep.getPackageName(), infraCredId,
-                        rep.getPackageType(), rep.getPackageVersion(), rep.getSeverity(), rep.getCvss3Score(), "ACTIVE");
+                timelineService.registerCveEvent(rep.getCve(), infraCredId,
+                        rep.getSeverity(), rep.getCvss3Score(), "ACTIVE");
             }
         }
 
@@ -375,11 +375,11 @@ public class WazuhService {
             Set<String> processedResolved = new HashSet<>();
             List<Long> resolvedIds = new ArrayList<>();
             for (VulnerabilityEntity vuln : currentlyActive) {
-                String cveKey = buildCveKey(vuln.getCve(), vuln.getPackageName());
+                String cveKey = buildCveKey(vuln.getCve());
                 if (resolvedCves.contains(cveKey)) {
                     if (processedResolved.add(cveKey)) {
-                        timelineService.registerCveEvent(vuln.getCve(), vuln.getPackageName(), infraCredId,
-                                vuln.getPackageType(), vuln.getPackageVersion(), vuln.getSeverity(), vuln.getCvss3Score(), "RESOLVED");
+                        timelineService.registerCveEvent(vuln.getCve(), infraCredId,
+                                vuln.getSeverity(), vuln.getCvss3Score(), "RESOLVED");
                     }
                     resolvedIds.add(vuln.getId());
                 }
@@ -428,7 +428,7 @@ public class WazuhService {
      * @param hits Lista de hits desde Wazuh.
      * @param activeByKey Mapa de vulnerabilidades activas por clave única (cve|agentId|packageName).
      * @param seenIds Conjunto de IDs de vulnerabilidades vistas durante esta sincronización.
-     * @param seenCves Conjunto de CVEs (cve|packageName) vistos durante esta sincronización.
+     * @param seenCves Conjunto de CVEs vistos durante esta sincronización (a nivel CVE, sin repetir por agente ni paquete).
      * @param countersByAgent Mapa de contadores de snapshots por agente.
      */
     @SuppressWarnings("unchecked")
@@ -525,8 +525,8 @@ public class WazuhService {
                     continue;
                 }
                 processedKeys.add(key);
-                // CVE visto durante esta sincronización (a nivel CVE, sin repetir por agente)
-                seenCves.add(buildCveKey(cve, pkgName));
+                // CVE visto durante esta sincronización (a nivel CVE, sin repetir por agente ni paquete)
+                seenCves.add(buildCveKey(cve));
 
                 Double cvssScore = extractCvssScore(v);
                 LocalDateTime detectedAt = parseDateTime(v.get("detected_at"));
@@ -606,8 +606,8 @@ public class WazuhService {
         return cve + "|" + agentId + "|" + (packageName != null ? packageName : "");
     }
 
-    private String buildCveKey(String cve, String packageName) {
-        return cve + "|" + (packageName != null ? packageName : "");
+    private String buildCveKey(String cve) {
+        return cve;
     }
 
     private Double extractCvssScore(Map<String, Object> vulnerabilityMap) {
