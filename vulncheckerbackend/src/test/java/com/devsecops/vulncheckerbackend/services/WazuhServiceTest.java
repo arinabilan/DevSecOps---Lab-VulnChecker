@@ -97,6 +97,7 @@ class WazuhServiceTest {
         verifyNoInteractions(vulnerabilityRepository);
         verifyNoInteractions(snapshotRepository);
         verify(tunnelManager).closeTunnel(session);
+        verify(tunnelManager).touch(session);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<HttpEntity<String>> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
@@ -225,6 +226,7 @@ class WazuhServiceTest {
         long count = service.getRemoteNewCount(CREDS, null);
 
         assertEquals(99L, count);
+        verify(tunnelManager).touch(session);
         verify(tunnelManager).closeTunnel(session);
         ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
         verify(restTemplate).exchange(urlCaptor.capture(), eq(HttpMethod.POST), any(), any(ParameterizedTypeReference.class));
@@ -279,7 +281,7 @@ class WazuhServiceTest {
         verify(agentRepository).save(any());
         verify(vulnerabilityRepository).saveAll(any());
         // La línea de tiempo registra una sola vez el CVE nuevo (ACTIVE), no por agente
-        verify(timelineService).registerCveEvent(eq("CVE-2026-1000"), any(), eq("High"), any(), eq("ACTIVE"));
+        verify(timelineService).registerCveEvent(eq("CVE-2026-1000"), any(), eq("ACTIVE"));
         verify(tunnelManager, atLeast(2)).closeTunnel(any());
         verify(snapshotRepository).save(any());
         verify(emitter).complete();
@@ -323,7 +325,7 @@ class WazuhServiceTest {
         // La vulnerabilidad que ya no aparece se elimina de active_vulnerabilities
         // y se registra una sola vez (por CVE, no por agente) el evento RESOLVED en el timeline.
         verify(timelineService).registerCveEvent(
-                eq("CVE-2026-0001"), eq(0L), eq("High"), any(), eq("RESOLVED"));
+                eq("CVE-2026-0001"), eq(0L), eq("RESOLVED"));
         verify(vulnerabilityRepository).deleteAllByIdInBatch(anyList());
     }
 
@@ -356,8 +358,10 @@ class WazuhServiceTest {
         service.performSync(CREDS, "task-4", mock(SseEmitter.class), true);
 
         // Mismo CVE en dos paquetes: se registra UNA sola vez (ACTIVE), sin importar el paquete
-        verify(timelineService, times(1)).registerCveEvent(eq("CVE-2026-2000"), eq(0L), eq("High"), any(), eq("ACTIVE"));
-        verify(timelineService, never()).registerCveEvent(eq("CVE-2026-2000"), eq(0L), eq("High"), any(), eq("RESOLVED"));
+        verify(timelineService, times(1)).registerCveEvent(eq("CVE-2026-2000"), eq(0L), eq("ACTIVE"));
+        verify(timelineService, never()).registerCveEvent(eq("CVE-2026-2000"), eq(0L), eq("RESOLVED"));
+        // El túnel se mantiene vivo por cada petición (1 _count + 2 búsquedas)
+        verify(tunnelManager, times(3)).touch(session);
     }
 
     @Test
@@ -390,7 +394,7 @@ class WazuhServiceTest {
         service.performSync(CREDS, "task-5", mock(SseEmitter.class), true);
 
         // El CVE sigue activo (cambió de paquete): no se registra ACTIVE ni RESOLVED espurios
-        verify(timelineService, never()).registerCveEvent(any(), any(), any(), any(), any());
+        verify(timelineService, never()).registerCveEvent(any(), any(), any());
         verify(vulnerabilityRepository, never()).deleteAllByIdInBatch(anyList());
     }
 
@@ -444,7 +448,7 @@ class WazuhServiceTest {
         service.performSync(CREDS, "task-6", mock(SseEmitter.class), true);
 
         // Los 6 CVEs válidos vistos se registran una sola vez como ACTIVE
-        verify(timelineService, times(6)).registerCveEvent(any(), eq(0L), any(), any(), eq("ACTIVE"));
+        verify(timelineService, times(6)).registerCveEvent(any(), eq(0L), eq("ACTIVE"));
         verify(vulnerabilityRepository).saveAll(anyList());
     }
 
@@ -479,7 +483,7 @@ class WazuhServiceTest {
 
         // Caso 1: la vulnerabilidad ya estaba activa -> solo se actualiza, sin evento de timeline
         verify(vulnerabilityRepository).saveAll(anyList());
-        verify(timelineService, never()).registerCveEvent(any(), any(), any(), any(), any());
+        verify(timelineService, never()).registerCveEvent(any(), any(), any());
         verify(vulnerabilityRepository, never()).deleteAllByIdInBatch(anyList());
     }
 
@@ -499,7 +503,7 @@ class WazuhServiceTest {
 
         service.performSync(CREDS, "task-8", mock(SseEmitter.class), false);
 
-        verify(timelineService, never()).registerCveEvent(any(), any(), any(), any(), any());
+        verify(timelineService, never()).registerCveEvent(any(), any(), any());
         verify(vulnerabilityRepository, never()).deleteAllByIdInBatch(anyList());
     }
 

@@ -176,6 +176,7 @@ public class WazuhService {
             String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
             headers.set("Authorization", "Basic " + encodedAuth);
             headers.setContentType(MediaType.APPLICATION_JSON);
+            tunnelManager.touch(session); // renovar el último uso del túnel antes de la petición
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     url, HttpMethod.POST, new HttpEntity<>(queryBody, headers),
                     new ParameterizedTypeReference<Map<String, Object>>() {}
@@ -308,7 +309,7 @@ public class WazuhService {
                         """, pageSize, rangeFilter, searchAfterClause);
 
                 // Ejecutar la búsqueda en Wazuh de las ultimas 2000 vulnerabilidades a través del túnel SSH
-                Map<String, Object> response = search(body, creds.wazuhUser(), creds.wazuhPassword(), localPort);
+                Map<String, Object> response = search(body, creds.wazuhUser(), creds.wazuhPassword(), localPort, session);
 
                 if (response != null && response.containsKey("hits")) {
                     Map<String, Object> hitsStructure = (Map<String, Object>) response.get("hits");
@@ -361,8 +362,7 @@ public class WazuhService {
         for (String cveKey : newlyActiveCves) {
             VulnerabilityEntity rep = representativeByCve.get(cveKey);
             if (rep != null) {
-                timelineService.registerCveEvent(rep.getCve(), infraCredId,
-                        rep.getSeverity(), rep.getCvss3Score(), "ACTIVE");
+                timelineService.registerCveEvent(rep.getCve(), infraCredId, "ACTIVE");
             }
         }
 
@@ -378,8 +378,7 @@ public class WazuhService {
                 String cveKey = buildCveKey(vuln.getCve());
                 if (resolvedCves.contains(cveKey)) {
                     if (processedResolved.add(cveKey)) {
-                        timelineService.registerCveEvent(vuln.getCve(), infraCredId,
-                                vuln.getSeverity(), vuln.getCvss3Score(), "RESOLVED");
+                        timelineService.registerCveEvent(vuln.getCve(), infraCredId, "RESOLVED");
                     }
                     resolvedIds.add(vuln.getId());
                 }
@@ -681,7 +680,7 @@ public class WazuhService {
         try {
             session = tunnelManager.openTunnel(creds.sshHost(), 22, creds.sshUser(), creds.sshPassword());
             int localPort = tunnelManager.getLocalPort(session);
-            return search(queryBody, creds.wazuhUser(), creds.wazuhPassword(), localPort);
+            return search(queryBody, creds.wazuhUser(), creds.wazuhPassword(), localPort, session);
         } finally {
             if (session != null) {
                 tunnelManager.closeTunnel(session);
@@ -689,7 +688,8 @@ public class WazuhService {
         }
     }
 
-    private Map<String, Object> search(String queryBody, String user, String password, int localPort) {
+    private Map<String, Object> search(String queryBody, String user, String password, int localPort, Session session) {
+        tunnelManager.touch(session); // renovar el último uso: evita que la eviction cierre el túnel en syncs largos
         String auth = user + ":" + password;
         String credentials = Base64.getEncoder().encodeToString(auth.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         HttpHeaders headers = new HttpHeaders();
