@@ -125,6 +125,26 @@ public class SshTunnelManager {
     }
 
     /**
+     * Marca una sesión como usada en este momento, renovando su timestamp de
+     * último uso. Se invoca antes de cada petición que atraviesa el túnel para
+     * evitar que la tarea de eviction cierre la sesión durante operaciones largas
+     * (p. ej. una sincronización FULL con paginación que dura varios minutos).
+     * <p>
+     * Si la sesión ya no está en la caché, no hace nada.
+     *
+     * @param session la sesión activa que se está utilizando
+     */
+    public void touch(Session session) {
+        if (session == null) return;
+        for (CachedSession cached : sessionCache.values()) {
+            if (cached.session.equals(session)) {
+                cached.updateLastUsed();
+                return;
+            }
+        }
+    }
+
+    /**
      * Obtiene el puerto local asociado a una sesión activa.
      *
      * @param session la sesión (debe haber sido abierta por este manager)

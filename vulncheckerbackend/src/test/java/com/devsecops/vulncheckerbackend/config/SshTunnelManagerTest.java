@@ -194,10 +194,57 @@ class SshTunnelManagerTest {
     }
 
     @Test
+    void touch_updatesLastUsed_forCachedSession() throws Exception {
+        try (MockedConstruction<JSch> mocked = mockConstruction(JSch.class, (mock, ctx) -> {
+            Session mockSession = mock(Session.class);
+            when(mockSession.isConnected()).thenReturn(true);
+            when(mockSession.setPortForwardingL(0, "127.0.0.1", 9200)).thenReturn(36251);
+            when(mock.getSession(anyString(), anyString(), anyInt())).thenReturn(mockSession);
+        })) {
+            manager = new SshTunnelManager();
+            Session session = manager.openTunnel("10.0.0.1", 22, "root", "password");
+
+            long before = readLastUsedMs(session);
+            Thread.sleep(5);
+            manager.touch(session);
+
+            assertTrue(readLastUsedMs(session) > before, "touch debe renovar el timestamp de último uso");
+        }
+    }
+
+    @Test
+    void touch_doesNothing_whenSessionNotInCache() {
+        manager = new SshTunnelManager();
+        Session unrelated = mock(Session.class);
+
+        assertDoesNotThrow(() -> manager.touch(unrelated));
+    }
+
+    @Test
+    void touch_doesNothing_whenSessionNull() {
+        manager = new SshTunnelManager();
+
+        assertDoesNotThrow(() -> manager.touch(null));
+    }
+
+    @Test
     void evictIdleSessions_runsWithoutError_whenCacheEmpty() throws Exception {
         manager = new SshTunnelManager();
         Method evict = SshTunnelManager.class.getDeclaredMethod("evictIdleSessions");
         evict.setAccessible(true);
         evict.invoke(manager);
+    }
+
+    private long readLastUsedMs(Session session) throws Exception {
+        java.lang.reflect.Field cacheField = SshTunnelManager.class.getDeclaredField("sessionCache");
+        cacheField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, ?> map = (java.util.Map<String, ?>) cacheField.get(manager);
+        for (Object cached : map.values()) {
+            java.lang.reflect.Field lastUsed = cached.getClass().getDeclaredField("lastUsedMs");
+            lastUsed.setAccessible(true);
+            return lastUsed.getLong(cached);
+        }
+        throw new IllegalStateException("Sesión no encontrada en caché");
     }
 }
