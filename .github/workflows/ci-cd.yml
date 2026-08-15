@@ -180,3 +180,27 @@ jobs:
             -d '{
             "applicationId": "${{ secrets.DOKPLOY_APP_ID }}"
           }'
+
+  # ETAPA 5: Análisis de Seguridad Dinámico (DAST con OWASP ZAP)
+  owasp-zap-dast:
+    name: OWASP ZAP Baseline Scan (DAST)
+    needs: deploy # Espera a que Dokploy complete el despliegue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Esperar a que la app inicie tras el despliegue
+        run: sleep 120 # Espera 120s a que el contenedor y Traefik respondan
+
+      - name: Escaneo ZAP Baseline
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: 'https://157.230.177.115.nip.io'
+          cmd_options: '-r zap_report.html'
+          allow_issue_writing: false
+          fail_action: false
+
+      - name: Subir Reporte ZAP como Artefacto
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-zap-dast-report
+          path: zap_report.html
