@@ -37,7 +37,7 @@ services:
       - app_internal
       - devsecops_net
     ports:
-      - '127.0.0.1:8080:8080'
+      - '127.0.0.1:8085:8080'
     # Montar solo src, pom y .mvn para no tapar /app/mvnw (evita "mvnw: not found" en algunos entornos)
     volumes:
       - ./vulncheckerbackend/src:/app/src

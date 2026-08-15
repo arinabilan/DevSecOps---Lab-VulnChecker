@@ -32,6 +32,30 @@ jobs:
         with:
           name: java-classes
           path: vulncheckerbackend/target/classes
+
+  # ETAPA 1.5: Análisis de Vulnerabilidades en Dependencias (OWASP Dependency-Check)
+  owasp-dependency-check:
+    name: OWASP Dependency-Check (SCA)
+    needs: check-compilacion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Escaneo OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'vulncheckerbackend'
+          path: 'vulncheckerbackend' # Analiza la carpeta del backend
+          format: 'HTML'
+          out: 'reports'
+          args: '--enableExperimental'
+
+      - name: Subir Reporte OWASP como Artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check-report
+          path: reports/dependency-check-report.html
         
   # ETAPA 2: Análisis de Calidad con Sonar
   sonarqube:
