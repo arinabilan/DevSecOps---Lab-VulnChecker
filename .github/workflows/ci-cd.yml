@@ -195,11 +195,7 @@ jobs:
         with:
           target: 'https://157.230.177.115.nip.io'
           # Parámetros clave para no tirar el Droplet:
-          cmd_options: >-
-            -r zap_report.html 
-            -config hostperscan.threadsPerHost=2 
-            -config activeScan.maxRuleDurationInMins=2 
-            -config activeScan.maxScanDurationInMins=10
+          cmd_options: '-r zap_report.html -config hostperscan.threadsPerHost=2 -config activeScan.maxRuleDurationInMins=2 -config activeScan.maxScanDurationInMins=10'
           allow_issue_writing: false
           fail_action: false
 
