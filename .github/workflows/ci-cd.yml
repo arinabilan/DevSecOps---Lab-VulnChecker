@@ -188,14 +188,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Esperar a que la app inicie tras el despliegue
-        run: sleep 120 # Espera 120s a que el contenedor y Traefik respondan
+        run: sleep 60 # Espera 60s a que el contenedor y Traefik respondan
 
       - name: Escaneo ZAP Full Scan
         uses: zaproxy/action-full-scan@v0.12.0
         with:
           target: 'https://157.230.177.115.nip.io'
-          # Parámetros clave para no tirar el Droplet:
-          cmd_options: '-r zap_report.html -config hostperscan.threadsPerHost=2 -config activeScan.maxRuleDurationInMins=2 -config activeScan.maxScanDurationInMins=10'
+          # Usamos -z para pasar configuraciones nativas a ZAP sin confundir al script ejecutor
+          cmd_options: '-z "-config hostperscan.threadsPerHost=2 -config activeScan.maxRuleDurationInMins=2 -config activeScan.maxScanDurationInMins=10"'
           allow_issue_writing: false
           fail_action: false
 
