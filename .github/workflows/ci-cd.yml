@@ -42,14 +42,14 @@ jobs:
       - name: Descargar el código
         uses: actions/checkout@v4
 
-      - name: Escaneo OWASP Dependency-Check
+      - name: Escaneo OWASP Dependency-Check (Full App)
         uses: dependency-check/Dependency-Check_Action@main
         with:
-          project: 'vulncheckerbackend'
+          project: 'DEVSECOPS-LAB-VULNCHECKER'
           format: 'HTML'
           out: 'reports'
-          # Le pasamos la ruta absoluta hacia la carpeta del backend
-          args: '--scan ${{ github.workspace }}/vulncheckerbackend --enableExperimental'
+          # Le decimos que escanee desde la raíz ('.' analiza backend y frontend)
+          args: '--scan . --enableExperimental'
 
       - name: Subir Reporte OWASP como Artefacto
         uses: actions/upload-artifact@v4
