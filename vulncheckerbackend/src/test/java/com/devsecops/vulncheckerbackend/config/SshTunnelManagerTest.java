@@ -240,11 +240,12 @@ class SshTunnelManagerTest {
         cacheField.setAccessible(true);
         @SuppressWarnings("unchecked")
         java.util.Map<String, ?> map = (java.util.Map<String, ?>) cacheField.get(manager);
-        for (Object cached : map.values()) {
-            java.lang.reflect.Field lastUsed = cached.getClass().getDeclaredField("lastUsedMs");
-            lastUsed.setAccessible(true);
-            return lastUsed.getLong(cached);
+        if (map.isEmpty()) {
+            throw new IllegalStateException("Sesión no encontrada en caché");
         }
-        throw new IllegalStateException("Sesión no encontrada en caché");
+        Object cached = map.values().iterator().next();
+        java.lang.reflect.Field lastUsed = cached.getClass().getDeclaredField("lastUsedMs");
+        lastUsed.setAccessible(true);
+        return lastUsed.getLong(cached);
     }
 }
