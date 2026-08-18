@@ -20,6 +20,11 @@ const Consumer = () => {
     const [notification, setNotification] = useState({ message: '', type: '' });
     const eventSourceRef = useRef(null);
 
+    const progressPercent = totalTarget > 0
+        ? Math.min((progressCount / totalTarget) * 100, 100)
+        : 0;
+    const visibleProgressPercent = Math.round(progressPercent);
+
     // Cargar credenciales disponibles
     useEffect(() => {
         const fetchCredentials = async () => {
@@ -50,6 +55,7 @@ const Consumer = () => {
             });
 
             eventSource.addEventListener('complete', () => {
+                setProgressCount((prev) => Math.max(prev, totalTarget));
                 setLoading(false);
                 setTaskId(null);
                 eventSource.close();
@@ -114,7 +120,7 @@ const Consumer = () => {
                 });
                 const countData = await countRes.json();
                 const newCount = countData.newCount || 0;
-                setTotalTarget(prev => prev + newCount);
+                setTotalTarget((prev) => prev + newCount);
 
                 // 2. Llamar al consumo (solo si hay novedades)
                 if (newCount > 0) {
@@ -182,6 +188,34 @@ const Consumer = () => {
                     </div>
 
                     <form onSubmit={handleSubmit} className="wazuh-form">
+                        {loading && (
+                            <div className="progress-card" role="status" aria-live="polite">
+                                <div className="progress-head">
+                                    <span>
+                                        {totalTarget > 0
+                                            ? `Recibidas ${progressCount} de ${totalTarget} vulnerabilidades`
+                                            : 'Calculando vulnerabilidades...' }
+                                    </span>
+                                    <strong>
+                                        {totalTarget > 0
+                                            ? `${visibleProgressPercent}%`
+                                            : '0%'}
+                                    </strong>
+                                </div>
+                                <div className={`progress-track ${totalTarget === 0 ? 'indeterminate' : ''}`}>
+                                    <div
+                                        className="progress-fill"
+                                        style={totalTarget > 0 ? { width: `${progressPercent}%` } : undefined}
+                                    />
+                                </div>
+                                {totalTarget > 0 && (
+                                    <p className="progress-caption">
+                                        La barra avanza según los eventos reales que llegan desde Wazuh.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         <div className="servers-list">
                             {servers.map((server) => (
                                 <div key={server.id} className={`server-row ${loading ? 'row-disabled' : ''}`}>
@@ -235,7 +269,7 @@ const Consumer = () => {
                             {loading ? (
                                 <>
                                     <Loader2 className="spinner" size={20} />
-                                    <span>Sincronizando: {progressCount} / {totalTarget}</span>
+                                    <span>Sincronizando vulnerabilidades...</span>
                                 </>
                             ) : (
                                 <>
