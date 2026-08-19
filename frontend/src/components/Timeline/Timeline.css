@@ -1,0 +1,149 @@
+/* Heredamos la mayoría de variables y estilos de Summary.css a través de las clases compartidas,
+   aquí definimos únicamente lo específico del gráfico de Gantt y los filtros numéricos. */
+
+.cvss-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--bg-secondary, #2a2a2a);
+    padding: 0 1rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #333);
+    color: #e0e0e0;
+    font-size: 0.875rem;
+}
+
+.cvss-filter-group input {
+    background: transparent;
+    border: none;
+    color: white;
+    width: 3.5rem;
+    text-align: center;
+    outline: none;
+    font-family: inherit;
+    border-bottom: 1px solid transparent;
+}
+
+.cvss-filter-group input:focus {
+    border-bottom: 1px solid #7c3aed; /* Color primario de acento */
+}
+
+/* --- TIMELINE CHART --- */
+
+.timeline-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    overflow-x: auto;
+    background-color: #1e1e1e;
+    border-radius: 4px;
+    min-width: 800px;
+}
+
+.timeline-header-row {
+    display: flex;
+    border-bottom: 1px solid #333;
+    background-color: #262626;
+    height: 40px;
+    align-items: center;
+    position: relative;
+}
+
+.timeline-cve-column {
+    width: 180px;
+    min-width: 180px;
+    padding: 0 1rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #a0a0a0;
+    border-right: 1px solid #333;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: inherit;
+    z-index: 2;
+}
+
+.timeline-grid-column {
+    flex: 1;
+    position: relative;
+    height: 100%;
+    min-width: 500px;
+}
+
+.timeline-month-marker {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateX(-50%); /* Centrar la marca en su porcentaje exacto */
+}
+
+.month-label {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 8px;
+    font-weight: 500;
+}
+
+.month-line {
+    /* Esta línea se extiende hacia abajo atravesando todas las filas */
+    position: absolute;
+    top: 40px; 
+    bottom: -1000vh; /* Hack visual para que la guía punteada baje por todo el contenedor */
+    width: 1px;
+    border-left: 1px dashed #444;
+    z-index: 0;
+}
+
+.timeline-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.timeline-row {
+    display: flex;
+    height: 48px;
+    align-items: center;
+    border-bottom: 1px solid #2a2a2a;
+    transition: background-color 0.2s ease;
+}
+
+.timeline-row:hover {
+    background-color: #252525;
+}
+
+.timeline-row .timeline-cve-column {
+    color: #e0e0e0;
+    background-color: #1e1e1e; /* Para evitar que la línea punteada se vea debajo del texto */
+}
+
+.cve-icon {
+    color: #ef4444; /* Rojo para vulnerabilidades */
+}
+
+.timeline-bar {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 12px;
+    background-color: #ef4444;
+    border-radius: 2px;
+    z-index: 1;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+    cursor: pointer;
+    transition: filter 0.2s ease;
+}
+
+.timeline-bar:hover {
+    filter: brightness(1.2);
+}
+
+.timeline-bar.ongoing {
+    /* Estilo diferente para barras que no han sido cerradas */
+    background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+    border-right: 2px solid #fff; /* Marca blanca para indicar que sigue activa */
+}

@@ -4,6 +4,7 @@ import {
     Table,
     BarChart3,
     History,
+    CalendarRange,
     ShieldAlert,
     ClipboardList,
     Settings as SettingsIcon,
@@ -20,11 +21,12 @@ const Home = () => {
         { id: 1, title: 'Tablas', icon: <Table size={40} />, desc: 'Visualiza datos crudos de activos.', path: '/tables' },
         { id: 2, title: 'Gráficos', icon: <BarChart3 size={40} />, desc: 'Análisis visual de las métricas.', path: '/charts' },
         { id: 3, title: 'Evolución', icon: <History size={40} />, desc: 'Histórico de seguridad en el tiempo.', path: '/evolution' },
-        { id: 4, title: 'Críticas', icon: <ShieldAlert size={40} />, desc: 'Vulnerabilidades de alta prioridad.', path: '/critical' },
-        { id: 5, title: 'Resumen', icon: <ClipboardList size={40} />, desc: 'Visualizar y descargas vulnerabilidades.', path: '/summary' },
+        { id: 4, title: 'Timeline', icon: <CalendarRange size={40} />, desc: 'Línea de tiempo por CVE y agente.', path: '/timeline' },
+        { id: 5, title: 'Críticas', icon: <ShieldAlert size={40} />, desc: 'Vulnerabilidades de alta prioridad.', path: '/critical' },
+        { id: 6, title: 'Resumen', icon: <ClipboardList size={40} />, desc: 'Visualizar y descargas vulnerabilidades.', path: '/summary' },
         // Condicional: Solo aparece si es ADMIN
         ...(userRole === 'ADMIN' ? [
-            { id: 6, title: 'Ajustes', icon: <SettingsIcon size={40} />, desc: 'Configuración del sistema y perfil.', path: '/settings' }
+            { id: 7, title: 'Ajustes', icon: <SettingsIcon size={40} />, desc: 'Configuración del sistema y perfil.', path: '/settings' }
         ] : []),
     ];
 

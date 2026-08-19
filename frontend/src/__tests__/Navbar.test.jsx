@@ -33,6 +33,7 @@ test('shows correct page title for known routes', () => {
     { path: '/tables', title: 'Explorador de Activos' },
     { path: '/charts', title: 'Análisis Métrico' },
     { path: '/evolution', title: 'Histórico' },
+    { path: '/timeline', title: 'Timeline' },
     { path: '/critical', title: 'Alertas Críticas' },
     { path: '/logs', title: 'Bitácora de Eventos' },
   ];
