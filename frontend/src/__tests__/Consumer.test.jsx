@@ -190,7 +190,7 @@ test('SSE progress event updates counter', async () => {
   const es = eventSourceInstances[0];
   es._dispatch('progress', { data: JSON.stringify({ processed: 3, total: 10 }) });
   await waitFor(() => {
-    expect(screen.getByText(/3 \/ 10/)).toBeInTheDocument();
+    expect(screen.getByText(/Recibidas 3 de 10 vulnerabilidades/i)).toBeInTheDocument();
   });
 });
 
