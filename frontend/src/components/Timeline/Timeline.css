@@ -88,16 +88,6 @@
     font-weight: 500;
 }
 
-.month-line {
-    /* Esta línea se extiende hacia abajo atravesando todas las filas */
-    position: absolute;
-    top: 40px; 
-    bottom: -1000vh; /* Hack visual para que la guía punteada baje por todo el contenedor */
-    width: 1px;
-    border-left: 1px dashed #444;
-    z-index: 0;
-}
-
 .timeline-body {
     display: flex;
     flex-direction: column;

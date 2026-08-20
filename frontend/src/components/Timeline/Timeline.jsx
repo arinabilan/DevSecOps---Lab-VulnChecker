@@ -110,7 +110,7 @@ const Timeline = () => {
             const params = new URLSearchParams();
             params.set('page', String(currentPage - 1));
             params.set('size', String(PAGE_SIZE));
-            params.set('agentId', agentFilter);
+            params.set('wazuhAgentId', agentFilter);
             
             if (severityFilter !== 'all') params.set('severity', severityFilter);
             if (packageTypeFilter !== 'all') params.set('packageType', packageTypeFilter);
@@ -197,16 +197,32 @@ const Timeline = () => {
                                     {timeAxis.months.map((month, idx) => (
                                         <div key={idx} className="timeline-month-marker" style={{ left: `${month.pos}%` }}>
                                             <div className="month-label">{month.label}</div>
-                                            <div className="month-line"></div>
+                                            {/* Eliminamos el div month-line de aquí */}
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
                             {/* Filas de CVEs */}
-                            <div className="timeline-body">
+                            <div className="timeline-body" style={{ position: 'relative' }}>
+                                {/* Capa de guías verticales exactas (Reemplaza el hack del CSS) */}
+                                <div style={{ position: 'absolute', top: 0, left: '180px', right: 0, bottom: 0, pointerEvents: 'none', zIndex: 0 }}>
+                                    {timeAxis.months.map((month, idx) => (
+                                        <div 
+                                            key={`guide-${idx}`} 
+                                            style={{ 
+                                                position: 'absolute', 
+                                                left: `${month.pos}%`, 
+                                                top: 0, 
+                                                bottom: 0, 
+                                                borderLeft: '1px dashed #444' 
+                                            }} 
+                                        />
+                                    ))}
+                                </div>
+
                                 {rows.map((row) => (
-                                    <div className="timeline-row" key={row.cve}>
+                                    <div className="timeline-row" key={row.cve} style={{ position: 'relative', zIndex: 1 }}>
                                         <div className="timeline-cve-column">
                                             <Activity size={14} className="cve-icon" />
                                             {row.cve}
@@ -225,7 +241,7 @@ const Timeline = () => {
                                                         key={idx} 
                                                         className={`timeline-bar ${!interval.endDate ? 'ongoing' : ''}`}
                                                         style={{ left: `${left}%`, width: `${width}%` }}
-                                                        title={`Inicio: ${new Date(interval.startDate).toLocaleDateString()} \nFin: ${interval.endDate ? new Date(interval.endDate).toLocaleDateString() : 'Activa'}`}
+                                                        title={`Severidad: ${row.severity || '-'}\nCVSS3: ${row.cvss3Score ?? '-'}\nTipo de paquete: ${row.packageType || '-'}\nInicio: ${new Date(interval.startDate).toLocaleDateString()}\nFin: ${interval.endDate ? new Date(interval.endDate).toLocaleDateString() : 'Activa'}`}
                                                     />
                                                 );
                                             })}
