@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
 import Charts from '../components/Charts/Charts';
@@ -113,4 +113,67 @@ test('handles items with null name', async () => {
   ));
   render(<MemoryRouter><Charts /></MemoryRouter>);
   expect(await screen.findByText('Sin dato')).toBeInTheDocument();
+});
+
+test('filters out non-numeric and non-positive values', async () => {
+  const data = {
+    total: 10,
+    category: [
+      { name: 'KeepMe', value: '30' },
+      { name: 'Invalid', value: 'abc' },
+      { name: 'Negative', value: -5 },
+      { name: 'Zero', value: 0 },
+    ],
+    severity: [], cve: [], package: [], agent: [],
+  };
+  vi.stubGlobal('fetch', vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve(data) })
+  ));
+  render(<MemoryRouter><Charts /></MemoryRouter>);
+  expect(await screen.findByText('KeepMe')).toBeInTheDocument();
+  expect(screen.queryByText('Invalid')).not.toBeInTheDocument();
+  expect(screen.queryByText('Negative')).not.toBeInTheDocument();
+  expect(screen.queryByText('Zero')).not.toBeInTheDocument();
+});
+
+test('normalizes whitespace-only names to fallback', async () => {
+  const data = { total: 5, category: [{ name: '   ', value: 3 }], severity: [], cve: [], package: [], agent: [] };
+  vi.stubGlobal('fetch', vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve(data) })
+  ));
+  render(<MemoryRouter><Charts /></MemoryRouter>);
+  expect(await screen.findByText('Sin dato')).toBeInTheDocument();
+});
+
+test('treats non-finite total as zero', async () => {
+  vi.stubGlobal('fetch', vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve({ ...mockStats, total: 'abc' }) })
+  ));
+  render(<MemoryRouter><Charts /></MemoryRouter>);
+  await waitFor(() => {
+    expect(screen.getByText(/No hay datos para construir graficos/i)).toBeInTheDocument();
+  });
+});
+
+test('agent card gets wide class', async () => {
+  vi.stubGlobal('fetch', vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve(mockStats) })
+  ));
+  const { container } = render(<MemoryRouter><Charts /></MemoryRouter>);
+  await screen.findByText('server-01');
+  expect(container.querySelector('.pie-card.wide')).toBeTruthy();
+});
+
+test('refresh button refetches data', async () => {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve(mockStats) })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Charts /></MemoryRouter>);
+  await screen.findByText('server-01');
+  const before = fetchMock.mock.calls.length;
+  fireEvent.click(screen.getByText(/Actualizar/i));
+  await waitFor(() => {
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(before);
+  });
 });

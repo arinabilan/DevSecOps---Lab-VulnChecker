@@ -133,6 +133,19 @@ test('disables previous on page 1', async () => {
   expect(screen.getByText(/Anterior/i)).toBeDisabled();
 });
 
+test('pagination previous navigates back', async () => {
+  vi.stubGlobal('fetch', tableMock());
+  renderTables();
+  await screen.findByText(/Página 1 de 5/i);
+  fireEvent.click(screen.getByText(/Siguiente/i));
+  await screen.findByText(/Página 2 de 5/i);
+  const prev = screen.getByText(/Anterior/i);
+  expect(prev).not.toBeDisabled();
+  fireEvent.click(prev);
+  await screen.findByText(/Página 1 de 5/i);
+  expect(screen.getByText(/Anterior/i)).toBeDisabled();
+});
+
 test('sorting by column header', async () => {
   vi.stubGlobal('fetch', tableMock());
   renderTables();

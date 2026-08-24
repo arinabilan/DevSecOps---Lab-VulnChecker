@@ -259,3 +259,103 @@ test('shows admin section for admin', async () => {
   renderSettings();
   expect(await screen.findByText(/Aprobaci.n de Usuarios/i)).toBeInTheDocument();
 });
+
+test('logs error when credential fetch fails', async () => {
+  const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('user_role', 'USER');
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/infra-credentials')) return Promise.reject(new Error('boom'));
+    return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  renderSettings();
+  await waitFor(() => {
+    expect(errSpy).toHaveBeenCalled();
+  });
+  errSpy.mockRestore();
+});
+
+test('logs error when user activation fails', async () => {
+  const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('user_role', 'ADMIN');
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/pending')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockPendingUsers) });
+    if (url && url.includes('/infra-credentials')) return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    if (url && url.includes('/activate')) return Promise.reject(new Error('boom'));
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  renderSettings();
+  await screen.findByText('Juan Perez Garcia');
+  fireEvent.click(screen.getByTitle(/Activar Usuario/i));
+  await waitFor(() => {
+    expect(errSpy).toHaveBeenCalled();
+  });
+  errSpy.mockRestore();
+});
+
+test('logs error when user deletion fails', async () => {
+  const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('user_role', 'ADMIN');
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/pending')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockPendingUsers) });
+    if (url && url.includes('/infra-credentials')) return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    if (url && url.includes('/users') && url.match(/\/users\/\d+$/)) return Promise.reject(new Error('boom'));
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  renderSettings();
+  await screen.findByText('Juan Perez Garcia');
+  fireEvent.click(screen.getByTitle(/Rechazar/i));
+  await waitFor(() => {
+    expect(errSpy).toHaveBeenCalled();
+  });
+  errSpy.mockRestore();
+});
+
+test('logs error when save request fails', async () => {
+  const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('user_role', 'USER');
+  localStorage.setItem('auth_basic', 'dGVzdDp0ZXN0');
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/infra-credentials')) return Promise.reject(new Error('boom'));
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  renderSettings();
+  await screen.findByText(/Guardar Perfil/i);
+  const form = document.querySelector('.credential-form');
+  const inputs = form.querySelectorAll('input');
+  const values = ['Test', 'ssh', 'pass', 'wazuh', 'wazpass'];
+  inputs.forEach((input, i) => fireEvent.change(input, { target: { value: values[i] } }));
+  fireEvent.submit(form);
+  await screen.findByText(/Verificaci.n de Seguridad/i);
+  fireEvent.submit(screen.getByRole('button', { name: /confirmar/i }).closest('form'));
+  await waitFor(() => {
+    expect(errSpy).toHaveBeenCalled();
+  });
+  errSpy.mockRestore();
+});
+
+test('typing verify password enables confirm button', async () => {
+  localStorage.setItem('user_id', '1');
+  localStorage.setItem('user_role', 'USER');
+  vi.stubGlobal('fetch', createFetchMock([], []));
+  renderSettings();
+  await screen.findByText(/Guardar Perfil/i);
+  const form = document.querySelector('.credential-form');
+  const inputs = form.querySelectorAll('input');
+  const values = ['Test', 'ssh', 'pass', 'wazuh', 'wazpass'];
+  inputs.forEach((input, i) => fireEvent.change(input, { target: { value: values[i] } }));
+  fireEvent.submit(form);
+  await screen.findByText(/Verificaci.n de Seguridad/i);
+  const confirmBtn = screen.getByRole('button', { name: /confirmar/i });
+  expect(confirmBtn).toBeDisabled();
+  const pwInput = document.querySelector('.modal-content input');
+  fireEvent.change(pwInput, { target: { value: 'secret' } });
+  expect(confirmBtn).not.toBeDisabled();
+});
