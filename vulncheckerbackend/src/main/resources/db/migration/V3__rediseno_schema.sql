@@ -73,6 +73,7 @@ SELECT
     w_severity,
     w_cvss3_score,
     w_package_name,
+    w_package_type,
     w_detection_time
 FROM active_vulnerabilities
 WHERE w_severity = 'Critical';
@@ -86,6 +87,7 @@ SELECT
     w_severity,
     w_cvss3_score,
     w_package_name,
+    w_package_type,
     w_detection_time
 FROM active_vulnerabilities
 WHERE EXTRACT(YEAR FROM w_detection_time) >= 2024;

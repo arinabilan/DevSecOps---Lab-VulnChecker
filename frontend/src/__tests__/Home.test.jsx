@@ -30,6 +30,7 @@ test('renders menu cards for USER role (no admin items)', () => {
   expect(screen.getByText('Tablas')).toBeInTheDocument();
   expect(screen.getByText('Gráficos')).toBeInTheDocument();
   expect(screen.getByText('Evolución')).toBeInTheDocument();
+  expect(screen.getByText('Timeline')).toBeInTheDocument();
   expect(screen.getByText('Críticas')).toBeInTheDocument();
   expect(screen.getByText('Resumen')).toBeInTheDocument();
   expect(screen.queryByText('Ajustes')).not.toBeInTheDocument();

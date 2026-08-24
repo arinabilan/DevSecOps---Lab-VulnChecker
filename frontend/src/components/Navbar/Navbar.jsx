@@ -19,6 +19,7 @@ const Navbar = () => {
         '/tables': 'Explorador de Activos',
         '/charts': 'Análisis Métrico',
         '/evolution': 'Histórico',
+        '/timeline': 'Timeline',
         '/critical': 'Alertas Críticas',
         '/logs': 'Bitácora de Eventos'
     };

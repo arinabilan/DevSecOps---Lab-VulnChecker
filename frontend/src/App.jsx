@@ -9,6 +9,7 @@ import Tables from './components/Tables/Tables';
 import Summary from './components/Summary/Summary';
 import Charts from './components/Charts/Charts';
 import Evolution from './components/Evolution/Evolution';
+import Timeline from './components/Timeline/Timeline';
 import './App.css';
 
 // Componente para proteger rutas
@@ -81,6 +82,10 @@ const AppContent = () => {
                 <Route
                     path="/evolution"
                     element={<ProtectedRoute><Evolution /></ProtectedRoute>}
+                />
+                <Route
+                    path="/timeline"
+                    element={<ProtectedRoute><Timeline /></ProtectedRoute>}
                 />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
