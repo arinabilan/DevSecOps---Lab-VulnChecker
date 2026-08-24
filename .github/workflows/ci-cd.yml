@@ -195,7 +195,7 @@ jobs:
         with:
           target: 'https://157.230.177.115.nip.io'
           # Usamos -z para pasar configuraciones nativas a ZAP sin confundir al script ejecutor
-          cmd_options: '-z "-config hostperscan.threadsPerHost=5 -config activeScan.maxRuleDurationInMins=5 -config activeScan.maxScanDurationInMins=25"'
+          cmd_options: '-z -config -z hostperscan.threadsPerHost=5 -z -config -z activeScan.maxRuleDurationInMins=5 -z -config -z activeScan.maxScanDurationInMins=20'
           allow_issue_writing: false
           fail_action: false
 
