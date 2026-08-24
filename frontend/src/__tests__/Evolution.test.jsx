@@ -205,3 +205,123 @@ test('page input click navigates', async () => {
   fireEvent.change(input, { target: { value: '2' } });
   fireEvent.click(screen.getByText('Ir'));
 });
+
+test('agent filter with real agent adds agentId param', async () => {
+  const filtersWithAgents = { columnOptions: [2, 3, 4], metrics: ['critical', 'high'], agentIds: [5] };
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/filters')) return Promise.resolve({ ok: true, json: () => Promise.resolve(filtersWithAgents) });
+    if (url && url.includes('/evolution')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockPage) });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  await screen.findByText('Evolución');
+  const agentSelect = screen.getByDisplayValue('Todos los agentes');
+  fireEvent.change(agentSelect, { target: { value: '5' } });
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('agentId=5'));
+  });
+});
+
+test('resets column count when options exclude current', async () => {
+  const filtersOnly23 = { columnOptions: [2, 3], metrics: ['critical'], agentIds: [] };
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/filters')) return Promise.resolve({ ok: true, json: () => Promise.resolve(filtersOnly23) });
+    if (url && url.includes('/evolution')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockPage) });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  await waitFor(() => {
+    expect(screen.getByDisplayValue(/Últimos 2 snapshots/i)).toBeInTheDocument();
+  });
+});
+
+test('shows error on HTTP failure', async () => {
+  const fetchMock = vi.fn((url) => {
+    if (url && url.includes('/filters')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFilters) });
+    return Promise.resolve({ ok: false, status: 500 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  expect(await screen.findByText(/No se pudo cargar la matriz/i)).toBeInTheDocument();
+});
+
+test('handles non-array content and columns', async () => {
+  const weird = { content: null, columns: null, totalPages: 1, totalElements: 3 };
+  vi.stubGlobal('fetch', evoMock(weird));
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  await waitFor(() => {
+    expect(screen.getByText(/No hay snapshots disponibles/i)).toBeInTheDocument();
+  });
+});
+
+test('sorting by agent name column', async () => {
+  const fetchMock = evoMock();
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  await screen.findByText(/Agentes en página/i);
+  fireEvent.click(screen.getByRole('button', { name: /Nombre/ }));
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('sortKey=agentName'));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('sortDir=asc'));
+  });
+});
+
+test('sorting by agent id column', async () => {
+  const fetchMock = evoMock();
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  await screen.findByText(/Agentes en página/i);
+  fireEvent.click(screen.getByRole('button', { name: /Agente/ }));
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('sortKey=agentId'));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('sortDir=asc'));
+  });
+});
+
+test('sorting by latest value column toggles', async () => {
+  const fetchMock = evoMock();
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  await screen.findByText(/Agentes en página/i);
+  fireEvent.click(screen.getByRole('button', { name: /Último/ }));
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('sortKey=latestValue'));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('sortDir=asc'));
+  });
+});
+
+test('sort toggle on agent name column', async () => {
+  const fetchMock = evoMock();
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  await screen.findByText(/Agentes en página/i);
+  fireEvent.click(screen.getByRole('button', { name: /Nombre/ }));
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('sortDir=asc'));
+  });
+  fireEvent.click(screen.getByRole('button', { name: /Nombre/ }));
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('sortDir=desc'));
+  });
+});
+
+test('pagination previous navigates back', async () => {
+  const pageData = {
+    content: [{ agentId: 1, agentName: 'srv', values: {} }],
+    columns: [{ key: '2024-01', label: 'Ene' }],
+    totalPages: 3, totalRecords: 25,
+  };
+  vi.stubGlobal('fetch', evoMock(pageData));
+  render(<MemoryRouter><Evolution /></MemoryRouter>);
+  await screen.findByText(/Agentes en página/i);
+  fireEvent.click(screen.getByText(/Siguiente/i));
+  await screen.findByText(/Página 2 de 3/i);
+  const prev = screen.getByText(/Anterior/i);
+  expect(prev).not.toBeDisabled();
+  fireEvent.click(prev);
+  await waitFor(() => {
+    expect(screen.getByText(/Página 1 de 3/i)).toBeInTheDocument();
+  });
+});
