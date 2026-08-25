@@ -18,7 +18,7 @@ const Home = () => {
     const navigate = useNavigate();
 
     const menuItems = [
-        { id: 1, title: 'Tablas', icon: <Table size={40} />, desc: 'Visualiza datos crudos de activos.', path: '/tables' },
+        //{ id: 1, title: 'Tablas', icon: <Table size={40} />, desc: 'Visualiza datos crudos de activos.', path: '/tables' },
         { id: 2, title: 'Gráficos', icon: <BarChart3 size={40} />, desc: 'Análisis visual de las métricas.', path: '/charts' },
         { id: 3, title: 'Evolución', icon: <History size={40} />, desc: 'Histórico de seguridad en el tiempo.', path: '/evolution' },
         { id: 4, title: 'Timeline', icon: <CalendarRange size={40} />, desc: 'Línea de tiempo por CVE y agente.', path: '/timeline' },
